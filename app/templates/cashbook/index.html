@@ -1,0 +1,323 @@
+{% extends 'base.html' %}
+{% block title %}کیش بک — روزنامچہ{% endblock %}
+{% block page_title %}کیش بک (روزنامچہ){% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0 text-end" dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+
+    <!-- DATE NAVIGATION BAR -->
+    <div class="card p-2 mb-3 bg-white border shadow-sm">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <span class="small fw-bold text-muted">تاریخ منتخب کریں:</span>
+                <input type="date" id="date_picker" class="form-control form-control-sm text-start d-inline-block w-auto" value="{{ view_date }}" dir="ltr" onchange="window.location.href='{{ url_for('cashbook.index') }}?date=' + this.value;">
+            </div>
+            <div class="d-flex align-items-center gap-1" dir="ltr">
+                <a href="{{ url_for('cashbook.index', date=prev_date) }}" class="btn btn-sm btn-outline-primary px-2.5">
+                    <i class="bi bi-chevron-left"></i> پچھلا دن
+                </a>
+                <span class="badge bg-primary fs-6 px-3 py-1.5 fw-bold mx-1">
+                     {{ view_date }}
+                </span>
+                <a href="{{ url_for('cashbook.index', date=next_date) }}" class="btn btn-sm btn-outline-primary px-2.5">
+                    اگلا دن <i class="bi bi-chevron-right"></i>
+                </a>
+            </div>
+            <div>
+                <a href="{{ url_for('cashbook.index', date=today) }}" class="btn btn-sm btn-success px-3 fw-bold {% if view_date == today %}disabled{% endif %}">
+                    آج کی تاریخ (Today)
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN INPUT FORM (Top Panel) -->
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-header bg-primary text-white py-2 fw-bold d-flex align-items-center justify-content-between">
+            <span><i class="bi bi-cash-coin me-1"></i> {% if edit_entry %}اندراج میں تصحیح کریں (ID: #{{ edit_entry.id }}){% else %}نیا اندراج شامل کریں{% endif %}</span>
+            {% if edit_entry %}
+                <a href="{{ url_for('cashbook.index', date=view_date) }}" class="btn btn-sm btn-light text-primary py-0 px-2 fw-semibold small">کینسل کریں</a>
+            {% endif %}
+        </div>
+        <div class="card-body p-3 bg-light-subtle">
+            <form method="POST" action="{{ url_for('cashbook.index', date=view_date) }}">
+                {% if edit_entry %}
+                    <input type="hidden" name="entry_id" value="{{ edit_entry.id }}">
+                {% endif %}
+
+                <div class="row g-2">
+                    <div class="col-12 col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">تاریخ</label>
+                        <input type="date" name="date" class="form-control text-start form-control-sm" value="{{ edit_entry.date.strftime('%Y-%m-%d') if edit_entry else view_date }}" dir="ltr" required>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">آمد یا خرچ</label>
+                        <select name="type" class="form-select form-select-sm fw-bold" required>
+                            <option value="credit" {% if edit_entry and edit_entry.type == 'credit' %}selected{% endif %}>آمد (Credit)</option>
+                            <option value="debit" {% if edit_entry and edit_entry.type == 'debit' %}selected{% endif %}>خرچ (Debit)</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">ہیڈ کی نوعیت</label>
+                        <select name="reference_type" id="reference_type" class="form-select form-select-sm" required>
+                            <option value="other" {% if edit_entry and edit_entry.reference_type == 'other' %}selected{% endif %}>دیگر</option>
+                            <option value="supplier" {% if edit_entry and edit_entry.reference_type == 'supplier' %}selected{% endif %}>سپلائر</option>
+                            <option value="customer" {% if edit_entry and edit_entry.reference_type == 'customer' %}selected{% endif %}>گاہک</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">کھاتہ تفصیل</label>
+                        <select name="reference_id" id="reference_id" class="form-select form-select-sm">
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">رقم</label>
+                        <input type="number" step="0.01" name="amount" class="form-control text-start form-control-sm fw-bold text-primary" placeholder="رقم درج کریں" dir="ltr" value="{{ edit_entry.amount if edit_entry else '' }}" required>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">وجہ / تفصیل</label>
+                        <input type="text" name="description" class="form-control form-control-sm" placeholder="وجہ درج کریں" value="{{ edit_entry.description if edit_entry else '' }}" required>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-2 pt-2 border-top">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" onclick="window.print();"><i class="bi bi-printer"></i> پرنٹ</button>
+                    <button type="submit" class="btn btn-sm btn-success px-4 fw-bold"><i class="bi bi-download"></i> محفوظ کریں</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <h4 class="text-center text-primary mb-3 fw-bold">آج کے تمام اندراجات</h4>
+
+    <!-- SIDE-BY-SIDE TRADITIONAL TABLES -->
+    <div class="row g-3">
+
+        <!-- CREDIT TABLE (آمد) -->
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-0">
+                <div class="card-header bg-success text-white py-1.5 fw-bold text-center fs-5 rounded-0">آمد (Credit)</div>
+                <div class="table-responsive" style="min-height: 250px;">
+                    <table class="table table-bordered table-sm align-middle mb-0 text-center small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>تفصیل / نام</th>
+                                <th>وجہ / تفصیل</th>
+                                <th>آمد (رقم)</th>
+                                <th style="width: 110px;">ایکشن</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- AUTO OPENING BALANCE ROW (Permanently Locked) -->
+                            {% if display_opening_credit > 0 %}
+                            <tr class="table-success fw-bold">
+                                <td class="text-success">باقی آمد</td>
+                                <td>پچھلا بقایا (B/F)</td>
+                                <td class="text-success fs-6">{{ "{:,.2f}".format(display_opening_credit) }}</td>
+                                <td class="text-muted small"><span class="badge bg-secondary-subtle text-muted py-1"><i class="bi bi-lock-fill"></i> محفوظ</span></td>
+                            </tr>
+                            {% endif %}
+
+                            {% if credit_entries %}
+                                {% for c in credit_entries %}
+                                <tr>
+                                    <td>
+                                        {% if c.reference_type == 'customer' %}گاہک{% elif c.reference_type == 'supplier' %}سپلائر{% else %}متفرق دستی{% endif %}
+                                    </td>
+                                    <td>{{ c.description }}</td>
+                                    <td class="text-success fw-bold">{{ "{:,.2f}".format(c.amount) }}</td>
+                                    <td>
+                                        <div class="d-flex justify-content-center gap-1">
+                                            <!-- LOCK LOGIC: Locks ONLY if it contains 'بل' or 'سٹاک' or 'Stock' or 'Bill' representing auto entries -->
+                                            {% if 'بل' in c.description or 'سٹاک' in c.description or 'Bill' in c.description or 'Stock' in c.description %}
+                                                <span class="badge bg-light text-muted border py-1 px-2" title="بلنگ سے لاکڈ ہے"><i class="bi bi-lock-fill"></i> بل</span>
+                                            {% else %}
+                                                <a href="{{ url_for('cashbook.index', date=view_date, edit_id=c.id) }}" class="btn btn-sm btn-info text-white px-2 py-0" title="تبدیل کریں">
+                                                    <i class="bi bi-pencil-square"></i>
+                                                </a>
+                                                <form action="{{ url_for('cashbook.delete_entry', entry_id=c.id) }}" method="POST" class="d-inline" onsubmit="return confirm('کیا آپ واقعی یہ ریکارڈ حذف کرنا چاہتے ہیں؟');">
+                                                    <button type="submit" class="btn btn-sm btn-danger px-2 py-0" title="حذف کریں">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% elif display_opening_credit == 0 %}
+                                <tr><td colspan="4" class="text-muted py-3">آج کوئی آمد نہیں ہے</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- DEBIT TABLE (خرچ) -->
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-0">
+                <div class="card-header bg-danger text-white py-1.5 fw-bold text-center fs-5 rounded-0">خرچ (Debit)</div>
+                <div class="table-responsive" style="min-height: 250px;">
+                    <table class="table table-bordered table-sm align-middle mb-0 text-center small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>تفصیل / نام</th>
+                                <th>وجہ / تفصیل</th>
+                                <th>خرچ (رقم)</th>
+                                <th style="width: 110px;">ایکشن</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- AUTO OPENING BALANCE ROW (Permanently Locked) -->
+                            {% if display_opening_debit > 0 %}
+                            <tr class="table-danger fw-bold">
+                                <td class="text-danger">باقی بنام</td>
+                                <td>پچھلا بقایا (B/F)</td>
+                                <td class="text-danger fs-6">{{ "{:,.2f}".format(display_opening_debit) }}</td>
+                                <td class="text-muted small"><span class="badge bg-secondary-subtle text-muted py-1"><i class="bi bi-lock-fill"></i> محفوظ</span></td>
+                            </tr>
+                            {% endif %}
+
+                            {% if debit_entries %}
+                                {% for d in debit_entries %}
+                                <tr>
+                                    <td>
+                                        {% if d.reference_type == 'customer' %}گاہک{% elif d.reference_type == 'supplier' %}سپلائر{% else %}متفرق دستی{% endif %}
+                                    </td>
+                                    <td>{{ d.description }}</td>
+                                    <td class="text-danger fw-bold">{{ "{:,.2f}".format(d.amount) }}</td>
+                                    <td>
+                                        <div class="d-flex justify-content-center gap-1">
+                                            <!-- LOCK LOGIC: Locks ONLY if it contains 'بل' or 'سٹاک' or 'Stock' or 'Bill' representing auto entries -->
+                                            {% if 'بل' in d.description or 'سٹاک' in d.description or 'Bill' in d.description or 'Stock' in d.description %}
+                                                <span class="badge bg-light text-muted border py-1 px-2" title="بلنگ سے لاکڈ ہے"><i class="bi bi-lock-fill"></i> بل</span>
+                                            {% else %}
+                                                <a href="{{ url_for('cashbook.index', date=view_date, edit_id=d.id) }}" class="btn btn-sm btn-info text-white px-2 py-0" title="تبدیل کریں">
+                                                    <i class="bi bi-pencil-square"></i>
+                                                </a>
+                                                <form action="{{ url_for('cashbook.delete_entry', entry_id=d.id) }}" method="POST" class="d-inline" onsubmit="return confirm('کیا آپ واقعی یہ ریکارڈ حذف کرنا چاہتے ہیں؟');">
+                                                    <button type="submit" class="btn btn-sm btn-danger px-2 py-0" title="حذف کریں">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% elif display_opening_debit == 0 %}
+                                <tr><td colspan="4" class="text-muted py-3">آج کوئی خرچ نہیں ہے</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- CUMULATIVE & SELECTED DAY DOUBLE TOTALS FOOTER STRIP -->
+    <div class="mt-4" dir="rtl">
+        <div class="row g-3">
+
+            <!-- 1. CURRENT SELECTED DAY TOTALS BLOCK -->
+            <div class="col-12">
+                <div class="card shadow-sm border-0 bg-white">
+                    <div class="card-header bg-primary text-white py-2 fw-bold text-center">
+                        <i class="bi bi-calendar-day me-1"></i> آج کا کُل حساب کتاب (Selected Day)
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="row text-center g-2">
+                            <div class="col-4 border-end">
+                                <div class="text-muted small fw-semibold mb-1">کُل آمد (روزانہ)</div>
+                                <div class="text-success fs-5 fw-bold" dir="ltr">+ {{ "{:,.2f}".format(view_total_credit) }}</div>
+                            </div>
+                            <div class="col-4 border-end">
+                                <div class="text-muted small fw-semibold mb-1">کُل خرچ (روزانہ)</div>
+                                <div class="text-danger fs-5 fw-bold" dir="ltr">- {{ "{:,.2f}".format(view_total_debit) }}</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="text-muted small fw-semibold mb-1">آج کا نیٹ بیلنس</div>
+                                <div class="{% if day_net_balance >= 0 %}text-success{% else %}text-danger{% endif %} fs-5 fw-bold" dir="ltr">
+                                    {{ "{:,.2f}".format(day_net_balance) }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. ALL-TIME CUMULATIVE TOTALS BLOCK -->
+<!--            <div class="col-12 col-md-6">-->
+<!--                <div class="card shadow-sm border-0 bg-dark text-white">-->
+<!--                    <div class="card-header bg-secondary text-white py-2 fw-bold text-center">-->
+<!--                        <i class="bi bi-layers-half me-1"></i> کُل کھاتہ گرینڈ ٹوٹل (All-Time Ledger)-->
+<!--                    </div>-->
+<!--                    <div class="card-body p-3">-->
+<!--                        <div class="row text-center g-2">-->
+<!--                            <div class="col-4 border-end border-secondary">-->
+<!--                                <div class="text-white-50 small fw-semibold mb-1">کُل آمدنی کھاتہ</div>-->
+<!--                                <div class="text-success fs-5 fw-bold" dir="ltr">{{ "{:,.2f}".format(all_time_credit) }}</div>-->
+<!--                            </div>-->
+<!--                            <div class="col-4 border-end border-secondary">-->
+<!--                                <div class="text-white-50 small fw-semibold mb-1">کُل اخراجات کھاتہ</div>-->
+<!--                                <div class="text-danger fs-5 fw-bold" dir="ltr">{{ "{:,.2f}".format(all_time_debit) }}</div>-->
+<!--                            </div>-->
+<!--                            <div class="col-4">-->
+<!--                                <div class="text-warning small fw-bold mb-1">ٹوٹل کیش ان ہینڈ (باقایا)</div>-->
+<!--                                <div class="text-warning fs-5 fw-extrabold" dir="ltr">-->
+<!--                                    {{ "{:,.2f}".format(all_time_balance) }}-->
+<!--                                </div>-->
+<!--                            </div>-->
+<!--                        </div>-->
+<!--                    </div>-->
+<!--                </div>-->
+<!--            </div>-->
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    const suppliersList = [ {% for s in suppliers %} { id: "{{ s.id }}", name: "{{ s.name }}" }, {% endfor %} ];
+    const customersList = [ {% for c in customers %} { id: "{{ c.id }}", name: "{{ c.name }}" }, {% endfor %} ];
+
+    const refTypeSelect = document.getElementById('reference_type');
+    const refIdSelect = document.getElementById('reference_id');
+
+    const currentRefType = "{{ edit_entry.reference_type if edit_entry else 'other' }}";
+    const currentRefId = "{{ edit_entry.reference_id if edit_entry and edit_entry.reference_id else '' }}";
+
+    function updateReferenceDropdown() {
+        const val = refTypeSelect.value;
+        refIdSelect.innerHTML = '';
+
+        if (val === 'other') {
+            const opt = document.createElement('option');
+            opt.value = ''; opt.textContent = 'متفرق دستی اخراجات';
+            refIdSelect.appendChild(opt);
+            refIdSelect.disabled = true;
+        } else {
+            refIdSelect.disabled = false;
+            let list = (val === 'supplier') ? suppliersList : customersList;
+            list.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.id; opt.textContent = item.name;
+                if(currentRefId && item.id == currentRefId) opt.selected = true;
+                refIdSelect.appendChild(opt);
+            });
+        }
+    }
+
+    refTypeSelect.addEventListener('change', updateReferenceDropdown);
+    document.addEventListener('DOMContentLoaded', () => {
+        if(currentRefType) refTypeSelect.value = currentRefType;
+        updateReferenceDropdown();
+    });
+</script>
+{% endblock %}

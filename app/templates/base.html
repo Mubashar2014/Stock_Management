@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}اسٹاک مینجمنٹ سسٹم{% endblock %}</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════
+           ROOT VARIABLES
+        ═══════════════════════════════ */
+        :root {
+            --primary:       #1a56db;
+            --primary-dark:  #1e3a5f;
+            --primary-light: #eff6ff;
+            --primary-mid:   #bfdbfe;
+            --sidebar-w:     270px;
+            --sidebar-bg:    #0f172a;
+            --sidebar-text:  #94a3b8;
+            --sidebar-hover: #1e293b;
+            --nav-h:         64px;
+            --body-bg:       #f1f5f9;
+            --surface:       #ffffff;
+            --border:        #e2e8f0;
+            --text:          #0f172a;
+            --text-muted:    #64748b;
+            --radius-sm:     8px;
+            --radius-md:     12px;
+            --radius-lg:     16px;
+            --shadow-sm:     0 1px 3px rgba(0,0,0,.06);
+            --shadow-md:     0 4px 16px rgba(0,0,0,.08);
+            --font:          'Noto Nastaliq Urdu', serif;
+        }
+
+        /* ═══════════════════════════════
+           BASE
+        ═══════════════════════════════ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font);
+            background: var(--body-bg);
+            color: var(--text);
+            font-size: 1rem;
+            line-height: 2;
+            overflow-x: hidden;
+        }
+
+        /* ═══════════════════════════════
+           LAYOUT
+        ═══════════════════════════════ */
+        .layout-wrapper { display: flex; min-height: 100vh; }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: var(--sidebar-w);
+            background: var(--sidebar-bg);
+            position: fixed;
+            top: 0; right: 0;
+            height: 100vh;
+            z-index: 1050;
+            display: flex;
+            flex-direction: column;
+            transition: transform .3s ease, right .3s ease;
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+        .sidebar::-webkit-scrollbar { display: none; }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: .85rem;
+            padding: 1.4rem 1.25rem;
+            border-bottom: 1px solid rgba(255,255,255,.06);
+            text-decoration: none;
+        }
+
+        .brand-icon {
+            width: 42px; height: 42px;
+            background: var(--primary);
+            border-radius: var(--radius-sm);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .brand-title {
+            display: block;
+            color: #fff;
+            font-weight: 700;
+            font-size: .95rem;
+            line-height: 1.6;
+        }
+
+        .brand-sub {
+            display: block;
+            color: var(--sidebar-text);
+            font-size: .75rem;
+            line-height: 1.4;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 1rem .75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-section-label {
+            font-size: .80rem;
+            font-weight: 600;
+            color:white;
+            padding: .85rem .75rem .3rem;
+            display: block;
+        }
+
+        .nav-link-item {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            padding: .6rem .85rem;
+            border-radius: var(--radius-sm);
+            color: white;
+            text-decoration: none;
+            font-size: .99rem;
+            transition: background .18s, color .18s;
+            font-weight: bolder;
+        }
+
+        .nav-link-item i {
+            font-size: 1.05rem;
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .nav-link-item:hover { background: var(--sidebar-hover); color: #cbd5e1; }
+        .nav-link-item.active { background: var(--primary); color: #fff; font-weight: 600; }
+
+        .sidebar-footer {
+            padding: .75rem;
+            border-top: 1px solid rgba(255,255,255,.06);
+        }
+
+        .logout-link { color: #f87171 !important; }
+        .logout-link:hover { background: rgba(248,113,113,.1) !important; }
+
+        /* ── Main Wrapper ── */
+        .main-wrapper {
+            margin-right: var(--sidebar-w);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            transition: margin-right .3s ease;
+            width: 100%;
+        }
+
+        /* ── Top Navbar ── */
+        .top-navbar {
+            height: var(--nav-h);
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 1.5rem;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .sidebar-toggle {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            border-radius: var(--radius-sm);
+            width: 38px; height: 38px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: background .15s;
+            flex-shrink: 0;
+        }
+        .sidebar-toggle:hover { background: var(--body-bg); }
+
+        .page-heading {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text);
+            flex: 1;
+            margin-right: .5rem;
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            background: var(--primary-light);
+            border: 1px solid var(--primary-mid);
+            border-radius: 50px;
+            padding: .3rem .85rem .3rem .5rem;
+            cursor: pointer;
+            font-family: var(--font);
+            font-size: .85rem;
+            color: var(--primary);
+            transition: background .15s;
+        }
+        .user-badge:hover { background: var(--primary-mid); }
+
+        .user-avatar {
+            width: 28px; height: 28px;
+            background: var(--primary);
+            color: #fff;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .78rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        /* ── Flash Area ── */
+        .flash-area { padding: 1rem 1.5rem 0; }
+
+        .flash-alert {
+            border-radius: var(--radius-sm);
+            font-size: .9rem;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+        }
+
+        /* ── Page Content ── */
+        .page-content { padding: 1.5rem; flex: 1; width: 100%; overflow-x: hidden; }
+
+        /* ── Cards ── */
+        .card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            background: var(--surface);
+            margin-bottom: 1rem;
+        }
+
+        .card-header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 1.25rem;
+            font-weight: 700;
+            font-size: 1rem;
+            border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
+        }
+
+        /* ── Tables ── */
+        .table { font-size: .92rem; margin-bottom: 0; }
+
+        .table thead th {
+            background: var(--primary-light);
+            color: var(--primary);
+            font-weight: 700;
+            font-size: .82rem;
+            border-bottom: 2px solid var(--primary-mid);
+            padding: .85rem 1rem;
+        }
+
+        .table tbody td {
+            padding: .8rem 1rem;
+            vertical-align: middle;
+            border-color: var(--border);
+        }
+
+        .table tbody tr:hover { background: #f8faff; }
+
+        /* ── Buttons ── */
+        .btn { font-family: var(--font); border-radius: var(--radius-sm); font-weight: 600; }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+
+        /* ── Forms ── */
+        .form-label {
+            font-weight: 600;
+            font-size: .9rem;
+            color: var(--text);
+            display: block;
+            text-align: right;
+        }
+
+        .form-control, .form-select {
+            font-family: var(--font);
+            border-radius: var(--radius-sm);
+            border-color: var(--border);
+            font-size: .92rem;
+            text-align: right;
+            padding: .55rem .9rem;
+            background: #f8fafc;
+            transition: border-color .2s, box-shadow .2s;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(26,86,219,.12);
+            background: #fff;
+        }
+
+        .input-group-text {
+            background: var(--primary-light);
+            border-color: var(--border);
+            color: var(--primary);
+        }
+
+        /* ── Badges ── */
+        .badge { font-family: var(--font); font-size: .75rem; }
+
+        /* ── Sidebar Overlay ── */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.45);
+            z-index: 1040;
+            backdrop-filter: blur(2px);
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 767.98px) {
+            .sidebar { transform: translateX(100%); }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar-overlay.show { display: block; }
+            .main-wrapper { margin-right: 0 !important; }
+            .page-content { padding: 1rem; }
+            .top-navbar { padding: 0 1rem; }
+            .flash-area { padding: .75rem 1rem 0; }
+
+            /* Sidebar mini layout desktop transitions unsetter for mobile */
+            .sidebar.closed-desktop { transform: translateX(100%) !important; }
+            .main-wrapper.full-desktop { margin-right: 0 !important; }
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<div class="layout-wrapper">
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <i class="bi bi-boxes"></i>
+            </div>
+            <div>
+                <span class="brand-title">اسٹاک سسٹم</span>
+                <span class="brand-sub">مینجمنٹ پینل</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <span class="nav-section-label">مرکزی</span>
+            <a href="{{ url_for('auth.dashboard') }}"
+               class="nav-link-item {% if request.endpoint == 'auth.dashboard' %}active{% endif %}">
+                <i class="bi bi-speedometer2"></i><span>ڈیش بورڈ</span>
+            </a>
+
+            <span class="nav-section-label">پروفائلز</span>
+            <div class="dropdown w-100 px-0">
+                <a class="nav-link-item dropdown-toggle text-start justify-content-between" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-person-lines-fill"></i><span>پروفائلز پینل</span>
+                    </div>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-dark border-0 shadow w-100" style="background: var(--sidebar-hover); padding: .5rem;">
+                    <li>
+                        <a class="dropdown-item nav-link-item py-2 {% if 'supplier' in request.endpoint %}active{% endif %}" href="{{ url_for('supplier_bp.list_suppliers') }}">
+                            <i class="bi bi-truck"></i><span>سپلائرز (Suppliers)</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item nav-link-item py-2 {% if 'customer' in request.endpoint %}active{% endif %}" href="{{ url_for('customer_bp.list_customers') }}">
+                            <i class="bi bi-people"></i><span>گاہک (Customers)</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item nav-link-item py-2 {% if 'material' in request.endpoint %}active{% endif %}" href="{{ url_for('material_bp.list_materials') }}">
+                            <i class="bi bi-box"></i><span>مٹیرہِل (Material)</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <span class="nav-section-label">اسٹاک ٹرانزیکشنز</span>
+            <a href="{{ url_for('stock_in.list_stock_in') }}" class="nav-link-item {% if 'stock_in_bp' in request.endpoint %}active{% endif %}">
+                <i class="bi bi-box-arrow-in-down"></i><span>مٹیریل خریداری</span>
+            </a>
+                       <a href="{{ url_for('stock_out.list_stock_out') }}" class="nav-link-item {% if 'stock-out' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-box-arrow-up"></i><span>مٹیریل فروخت</span>
+</a>
+
+            <span class="nav-section-label">حسابات</span>
+            <a href="#" class="nav-link-item">
+                <i class="bi bi-journal-text"></i><span>کھاتا بک</span>
+            </a>
+            <a href="{{ url_for('cashbook.index') }}" class="nav-link-item {% if 'cashbook' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-journal-text"></i><span>کیش بک</span>
+</a>
+
+        </nav>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('auth.logout') }}" class="nav-link-item logout-link">
+                <i class="bi bi-box-arrow-right"></i><span>لاگ آؤٹ</span>
+            </a>
+        </div>
+    </aside>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="main-wrapper" id="mainWrapper">
+
+        <header class="top-navbar">
+            <button class="sidebar-toggle" id="sidebarToggle" aria-label="مینو">
+                <i class="bi bi-list"></i>
+            </button>
+            <h1 class="page-heading">{% block page_title %}ڈیش بورڈ{% endblock %}</h1>
+            <div class="dropdown">
+                <button class="user-badge dropdown-toggle border-0"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="user-avatar">{{ current_user.username[0] | upper }}</span>
+                    <span class="d-none d-sm-inline">{{ current_user.username }}</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-start shadow-sm">
+                    <li>
+                        <a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">
+                            <i class="bi bi-box-arrow-right me-2"></i>لاگ آؤٹ
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </header>
+
+        <div class="flash-area">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show flash-alert" role="alert">
+                            <i class="bi bi-{% if category == 'success' %}check-circle-fill{% elif category == 'danger' %}exclamation-circle-fill{% elif category == 'warning' %}exclamation-triangle-fill{% else %}info-circle-fill{% endif %}"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <main class="page-content">
+            {% block content %}{% endblock %}
+        </main>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        const toggleBtn = document.getElementById('sidebarToggle');
+        const mainWrapper = document.getElementById('mainWrapper');
+
+        // 1. PAGE RELOAD / LOAD PAR PURANI STATE DOBARA APPLAI KARNA
+        if (window.innerWidth >= 768) {
+            const savedState = localStorage.getItem('sidebar_state');
+            if (savedState === 'closed') {
+                sidebar.classList.add('closed-desktop');
+                mainWrapper.classList.add('full-desktop');
+                sidebar.style.transform = "translateX(100%)";
+                mainWrapper.style.marginRight = "0";
+            } else {
+                sidebar.classList.remove('closed-desktop');
+                mainWrapper.classList.remove('full-desktop');
+                sidebar.style.transform = "translateX(0)";
+                mainWrapper.style.marginRight = "var(--sidebar-w)";
+            }
+        }
+
+        // 2. TOGGLE BUTTON CLICK LOGIC WITH LOCALSTORAGE SAVE
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+
+                if (window.innerWidth >= 768) {
+                    sidebar.classList.toggle('closed-desktop');
+                    mainWrapper.classList.toggle('full-desktop');
+
+                    if(sidebar.classList.contains('closed-desktop')) {
+                        sidebar.style.transform = "translateX(100%)";
+                        mainWrapper.style.marginRight = "0";
+                        localStorage.setItem('sidebar_state', 'closed'); // Band state yaad rakhega
+                    } else {
+                        sidebar.style.transform = "translateX(0)";
+                        mainWrapper.style.marginRight = "var(--sidebar-w)";
+                        localStorage.setItem('sidebar_state', 'open');   // Khuli state yaad rakhega
+                    }
+                } else {
+                    sidebar.style.transform = "";
+                    sidebar.classList.toggle('open');
+                    overlay.classList.toggle('show');
+                }
+            });
+        }
+
+        if (overlay) {
+            overlay.addEventListener('click', function() {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('show');
+            });
+        }
+    });
+
+    // Auto-dismiss alerts safely after 4 seconds
+    setTimeout(function() {
+        let alerts = document.querySelectorAll('.flash-alert');
+        alerts.forEach(function(alert) {
+            let bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
+            if (bsAlert) bsAlert.close();
+        });
+    }, 4000);
+</script>
+{% endblock %}
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

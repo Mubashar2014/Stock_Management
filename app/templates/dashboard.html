@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+
+{% block title %}مرکزی ڈیش بورڈ — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block page_title %}مرکزی ڈیش بورڈ{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Dashboard Custom Styling ── */
+    .welcome-banner {
+        background: linear-gradient(135deg, var(--sidebar-bg) 0%, var(--primary-dark) 50%, var(--primary) 100%);
+        border: none;
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-md);
+        position: relative;
+        overflow: hidden;
+    }
+    .welcome-banner::after {
+        content: '';
+        position: absolute;
+        width: 250px; height: 250px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 50%;
+        top: -60px; left: -60px;
+    }
+
+    .material-card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
+        background: var(--surface);
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .material-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+        border-color: var(--primary-mid);
+    }
+
+    .material-img-wrapper {
+        width: 100%;
+        height: 180px;
+        background: linear-gradient(to bottom, #f8fafc, #ffffff);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-bottom: 1px solid var(--border);
+        padding: 1rem;
+        position: relative;
+    }
+    .material-img {
+        max-height: 140px;
+        max-width: 100%;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 6px rgba(0,0,0,0.05));
+        transition: transform 0.2s ease;
+    }
+    .material-card:hover .material-img {
+        transform: scale(1.04);
+    }
+
+    .card-info-box {
+        background: #f8fafc;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 0.75rem 1rem;
+    }
+
+    .qty-badge {
+        font-family: var(--font);
+        font-size: 1.15rem;
+        font-weight: 700;
+        padding: 0.35rem 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0 text-end" dir="rtl">
+
+    <div class="card welcome-banner mb-4">
+        <div class="card-body p-4 p-md-5">
+            <h3 class="fw-bold text-white mb-2" style="line-height: 1.6;">السلام علیکم، {{ current_user.username }}!</h3>
+            <p class="mb-0 text-white-50 small" style="font-size: 0.95rem; max-width: 600px; line-height: 1.8;">
+                اسٹاک مٹیریل مینجمنٹ سسٹم میں خوش آمدید۔ نیچے دیے گئے کارڈز مٹیریل کی موجودہ لائیو مقدار کو ظاہر کرتے ہیں۔
+            </p>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-grid-3x3-gap-fill text-primary me-2"></i>موجودہ مٹیریل اسٹاک کی صورتحال
+        </h5>
+    </div>
+
+    <div class="row g-4">
+        {% if materials %}
+            {% for m in materials %}
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                <div class="card material-card">
+
+                    <div class="material-img-wrapper">
+                        <img src="{{ url_for('static', filename='uploads/' + m.image_file) if m.image_file != 'default_material.png' else url_for('static', filename='img/default_material.png') }}"
+                             alt="{{ m.name }}"
+                             class="material-img"
+                             onerror="this.src='https://placehold.co/200x160/f1f5f9/94a3b8?text=%D9%86%D8%A3%D9%85%D9%88%D8%AC%D9%88%D8%AF';">
+                    </div>
+
+                    <div class="card-body p-3.5 d-flex flex-column justify-content-between">
+                        <div class="mb-3">
+                            <h5 class="fw-bold text-slate-800 mb-1" style="line-height: 1.6; font-size: 1.1rem;">{{ m.name }}</h5>
+                            <span class="text-muted small"><i class="bi bi-tag me-1"></i> مٹیریل پروفائل</span>
+                        </div>
+
+                        <div class="card-info-box d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="status-indicator {% if m.remaining_qty > 10 %}bg-success{% else %}bg-danger{% endif %}"></span>
+                                <span class="text-muted small fw-semibold">باقی مقدار:</span>
+                            </div>
+                            <span class="qty-badge {% if m.remaining_qty > 10 %}bg-success-subtle text-success border border-success-subtle{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %}">
+                                {{ m.remaining_qty }}
+                                <span class="fw-normal text-muted ms-1" style="font-size: 0.8rem;">{{ m.unit }}</span>
+                            </span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12 text-center py-5">
+                <div class="card border-0 p-5 shadow-sm bg-white rounded-4">
+                    <div class="text-muted">
+                        <i class="bi bi-box-seam text-primary-mid" style="font-size: 4rem;"></i>
+                        <h4 class="mt-4 fw-bold text-dark">کوئی مٹیریل موجود نہیں ہے</h4>
+                        <br>
+                        <p class="text-muted small mt-2">سسٹم میں لائیو اسٹاک دیکھنے کے لیے پہلے سپلائر اور مٹیریل کا اندراج کریں۔</p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+    // Agar dashboard par koi custom script chalani ho to yahan likhein,
+    // warna super() aap ki base.html wale toggle buttons ko active rakhega.
+</script>
+{% endblock %}

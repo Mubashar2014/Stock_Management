@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}نیا مٹیریل شامل کریں — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block page_title %}نیا مٹیریل اندراج{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0 text-end" dir="rtl">
+    <div class="mb-4">
+        <a href="{{ url_for('material_bp.list_materials') }}" class="btn btn-light border d-inline-flex align-items-center gap-2 text-secondary">
+            <i class="bi bi-arrow-right"></i> <span>فہرست میں واپس جائیں</span>
+        </a>
+    </div>
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold text-dark py-3"><i class="bi bi-box-seam text-primary me-1"></i> نئے مٹیریل کی تفصیلات درج کریں</div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('material_bp.add_material') }}" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="name" class="form-label mb-2">مٹیریل کا نام <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" placeholder="مثال: اینگل آئرن 1.5 انچ" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="unit" class="form-label mb-2">پیمائش کی اکائی (Unit) <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="unit" name="unit" placeholder="مثال: کلوگرام، میٹر، پیس (Piece)" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="image" class="form-label mb-2">مٹیریل کی تصویر</label>
+                            <input type="file" class="form-control text-start" id="image" name="image" accept="image/*" dir="ltr">
+                        </div>
+                        <div class="mb-4">
+                            <label for="description" class="form-label mb-2">تفصیل / وضاحتی نوٹ</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" placeholder="مٹیریل کے متعلق اضافی معلومات (اختیاری)"></textarea>
+                        </div>
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-primary py-2.5 fw-bold fs-6"><i class="bi bi-check-circle me-1"></i> مٹیریل محفوظ کریں</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

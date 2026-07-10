@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% block title %}نئی خریداری کا اندراج — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block page_title %}نیا اسٹاک خریداری فارم{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0 text-end" dir="rtl">
+    <div class="mb-4">
+        <a href="{{ url_for('stock_in.list_stock_in') }}" class="btn btn-light border d-inline-flex align-items-center gap-2 text-secondary">
+            <i class="bi bi-arrow-right"></i> <span>خریداری ریکارڈ میں واپس جائیں</span>
+        </a>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold text-dark py-3">
+                    <i class="bi bi-box-arrow-in-down text-primary me-1"></i> مٹیریل خریداری (Stock In) کی معلومات درج کریں
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('stock_in.add_stock_in') }}">
+                        
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-6">
+                                <label for="supplier_id" class="form-label mb-2">سپلائر منتخب کریں <span class="text-danger">*</span></label>
+                                <select class="form-select" id="supplier_id" name="supplier_id" required>
+                                    <option value="">-- سپلائر منتخب کریں --</option>
+                                    {% for s in suppliers %}
+                                        <option value="{{ s.id }}">{{ s.name }} (موجودہ کھاتا: {{ "{:,.0f}".format(s.current_balance) }} روپے)</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="material_id" class="form-label mb-2">مٹیریل منتخب کریں <span class="text-danger">*</span></label>
+                                <select class="form-select" id="material_id" name="material_id" required>
+                                    <option value="">-- مٹیریل منتخب کریں --</option>
+                                    {% for m in materials %}
+                                        <option value="{{ m.id }}">{{ m.name }} (اکائی: {{ m.unit }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-4">
+                                <label for="quantity" class="form-label mb-2">مقدار (Quantity) <span class="text-danger">*</span></label>
+                                <input type="number" step="0.01" class="form-control text-start" id="quantity" name="quantity" placeholder="0.00" dir="ltr" required>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label for="rate" class="form-label mb-2">فی اکائی ریٹ (Rate) <span class="text-danger">*</span></label>
+                                <input type="number" step="0.01" class="form-control text-start" id="rate" name="rate" placeholder="0.00" dir="ltr" required>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label for="date" class="form-label mb-2">خریداری کی تاریخ</label>
+                                <input type="date" class="form-control text-start" id="date" name="date" value="{{ today }}" dir="ltr" required>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-4">
+                                <label for="other_expenses" class="form-label mb-2">اضافی خرچے (مزدوری/بھاڑہ)</label>
+                                <input type="number" step="0.01" class="form-control text-start" id="other_expenses" name="other_expenses" value="0.00" dir="ltr">
+                            </div>
+                            <div class="col-12 col-md-8">
+                                <label for="other_expenses_details" class="form-label mb-2">اضافی خرچے کی تفصیل</label>
+                                <input type="text" class="form-control" id="other_expenses_details" name="other_expenses_details" placeholder="مثال کے طور پر: گاڑی کا کرایہ یا لوڈنگ مزدوری">
+                            </div>
+                        </div>
+
+                        <hr class="my-4" style="border-color: var(--border);">
+
+                        <div class="row g-3 mb-4 bg-light p-3 rounded border">
+                            <div class="col-12 col-md-4 text-center">
+                                <span class="text-muted small">کل رقم (مقدار × ریٹ + خرچہ)</span>
+                                <h4 class="fw-bold text-dark mt-1" id="display_total">0.00 روپے</h4>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label for="paid_amount" class="form-label mb-1 text-center d-block text-success fw-bold">موقع پر ادا شدہ رقم (Paid)</label>
+                                <input type="number" step="0.01" class="form-control text-start border-success" id="paid_amount" name="paid_amount" value="0.00" dir="ltr">
+                            </div>
+                            <div class="col-12 col-md-4 text-center">
+                                <span class="text-muted small text-danger fw-bold">باقی ادھار رقم (Remaining)</span>
+                                <h4 class="fw-bold text-danger mt-1" id="display_remaining">0.00 روپے</h4>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label mb-2">اضافی نوٹس / ریمارکس</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="2" placeholder="اس خریداری کے متعلق کوئی خاص بات لکھنا چاہیں..."></textarea>
+                        </div>
+
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-primary py-2.5 fw-bold fs-6">
+                                <i class="bi bi-check-circle me-1"></i> خریداری کا اندراج مکمل کریں
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const qtyInput = document.getElementById('quantity');
+        const rateInput = document.getElementById('rate');
+        const expenseInput = document.getElementById('other_expenses');
+        const paidInput = document.getElementById('paid_amount');
+        
+        const displayTotal = document.getElementById('display_total');
+        const displayRemaining = document.getElementById('display_remaining');
+
+        function calculateAmounts() {
+            const qty = parseFloat(qtyInput.value) || 0;
+            const rate = parseFloat(rateInput.value) || 0;
+            const expense = parseFloat(expenseInput.value) || 0;
+            const paid = parseFloat(paidInput.value) || 0;
+
+            // Business Formula
+            const total = (qty * rate) + expense;
+            const remaining = total - paid;
+
+            // Live Format update string render
+            displayTotal.innerText = total.toLocaleString('en-US', {minimumFractionDigits: 2}) + " روپے";
+            displayRemaining.innerText = remaining.toLocaleString('en-US', {minimumFractionDigits: 2}) + " روپے";
+        }
+
+        // Event listeners bind
+        qtyInput.addEventListener('input', calculateAmounts);
+        rateInput.addEventListener('input', calculateAmounts);
+        expenseInput.addEventListener('input', calculateAmounts);
+        paidInput.addEventListener('input', calculateAmounts);
+    });
+</script>
+{% endblock %}

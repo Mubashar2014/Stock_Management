@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block title %}فروخت کا ریکارڈ — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block page_title %}مٹیریل فروخت (Stock Out) ریکارڈ{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0 text-end" dir="rtl">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-journal-arrow-up text-primary me-2"></i> مٹیریل فروخت ہسٹری</h5>
+        <a href="{{ url_for('stock_out.add_stock_out') }}" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2">
+            <i class="bi bi-plus-circle"></i> <span>نئی فروخت درج کریں</span>
+        </a>
+    </div>
+
+    <!-- Filter Card Area -->
+    <div class="card p-3 mb-4 bg-white">
+        <form method="GET" action="{{ url_for('stock_out.list_stock_out') }}" class="row g-3 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label mb-1 small fw-bold text-muted">شروع کی تاریخ</label>
+                <input type="date" name="start_date" class="form-control text-start" value="{{ start_date }}" dir="ltr">
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label mb-1 small fw-bold text-muted">آخری تاریخ</label>
+                <input type="date" name="end_date" class="form-control text-start" value="{{ end_date }}" dir="ltr">
+            </div>
+            <div class="col-12 col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-funnel-fill"></i> فلٹر کریں
+                </button>
+                <a href="{{ url_for('stock_out.list_stock_out') }}" class="btn btn-light border w-100 py-2 text-secondary text-center">
+                    آج کا ریکارڈ
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>تاریخ</th>
+                        <th>گاہک کا نام</th>
+                        <th>مٹیریل</th>
+                        <th>مقدار (Qty)</th>
+                        <th>ریٹ</th>
+                        <th>اضافی خرچہ</th>
+                        <th>چھوٹ (Disc)</th>
+                        <th>کل رقم</th>
+                        <th>وصول شدہ</th>
+                        <th>بقايا رقم</th>
+                        <th style="width: 110px; text-align: center;">ایکشن</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if entries %}
+                        {% for e in entries %}
+                        <tr>
+                            <td class="fw-medium text-secondary">{{ e.date.strftime('%Y-%m-%d') }}</td>
+                            <td class="fw-bold text-dark">{{ e.customer.name if e.customer else '—' }}</td>
+                            <td class="fw-bold text-primary">{{ e.material.name if e.material else '—' }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ "{:,.2f}".format(e.quantity) }} {{ e.material.unit }}</span></td>
+                            <td>{{ "{:,.2f}".format(e.rate) }}</td>
+                            <td class="text-secondary" title="{{ e.other_expenses_details }}">{{ "{:,.2f}".format(e.other_expenses) }}</td>
+                            <td class="text-warning">{{ "{:,.2f}".format(e.discount) }}</td>
+                            <td class="fw-bold text-dark">{{ "{:,.2f}".format(e.total_amount) }}</td>
+                            <td class="text-success">{{ "{:,.2f}".format(e.paid_amount) }}</td>
+                            <td class="fw-bold {% if e.remaining > 0 %}text-danger{% else %}text-muted{% endif %}">
+                                {{ "{:,.2f}".format(e.remaining) }}
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center gap-1" dir="ltr">
+                                    <a href="{{ url_for('stock_out.edit_stock_out', entry_id=e.id) }}" class="btn btn-sm btn-outline-primary py-1 px-2">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form action="{{ url_for('stock_out.delete_stock_out', entry_id=e.id) }}" method="POST" onsubmit="return confirm('کیا آپ واقعی اس ریکارڈ کو ختم کرنا چاہتے ہیں؟ گاہک کا کھاتا ریورس ہو جائے گا۔');" style="display:inline;">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="11" class="text-center py-5 text-muted">
+                                <i class="bi bi-filter-square text-muted" style="font-size: 2.5rem;"></i>
+                                <p class="mt-2 mb-0 fw-medium">منتخب کردہ تاریخوں میں کوئی فروخت کا ریکارڈ نہیں ملا۔</p>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}گاہکوں کی فہرست — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block page_title %}گاہک (Customers) مینجمنٹ{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0 text-end" dir="rtl">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-people text-primary me-2"></i> رجسٹرڈ گاہکوں کی تفصیلات</h5>
+        <a href="{{ url_for('customer_bp.add_customer') }}" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2">
+            <i class="bi bi-plus-circle"></i> <span>نیا گاہک شامل کریں</span>
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header fw-bold text-slate-800">گاہکوں کا ریکارڈ (کھاتا جات)</div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">آئی ڈی</th>
+                        <th>گاہک کا نام</th>
+                        <th>فون نمبر</th>
+                        <th>پتہ / ایڈریس</th>
+                        <th>ابتدائی بیلنس</th>
+                        <th>موجودہ بیلنس</th>
+                        <th style="width: 120px; text-align: center;">ایکشنز</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if customers %}
+                        {% for c in customers %}
+                        <tr>
+                            <td class="fw-bold text-muted">#{{ c.id }}</td>
+                            <td class="fw-bold text-dark">{{ c.name }}</td>
+                            <td class="text-secondary">{{ c.phone if c.phone else '—' }}</td>
+                            <td class="text-secondary">{{ c.address if c.address else '—' }}</td>
+                            <td class="text-primary fw-medium">{{ "{:,.2f}".format(c.opening_balance) }} روپے</td>
+                            <td class="fw-bold {% if c.current_balance > 0 %}text-success{% else %}text-muted{% endif %}">
+                                {{ "{:,.2f}".format(c.current_balance) }} روپے
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center gap-2">
+                                    <a href="{{ url_for('customer_bp.edit_customer', customer_id=c.id) }}" class="btn btn-sm btn-outline-primary py-1 px-2"><i class="bi bi-pencil-square"></i></a>
+                                    <form action="{{ url_for('customer_bp.delete_customer', customer_id=c.id) }}" method="POST" onsubmit="return confirm('کیا آپ واقعی اس گاہک کا ریکارڈ ختم کرنا چاہتے ہیں؟');" style="display:inline;">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="bi bi-people text-muted" style="font-size: 2.5rem;"></i>
+                                <p class="mt-2 mb-0 fw-medium">سستم میں ابھی تک کوئی گاہک شامل نہیں کیا گیا۔</p>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

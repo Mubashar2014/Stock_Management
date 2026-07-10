@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لاگ ان — اسٹاک مینجمنٹ سسٹم</title>
+
+    <!-- Bootstrap 5 RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Noto Nastaliq Urdu -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary:      #1a56db;
+            --primary-dark: #1e3a5f;
+            --border:       #e2e8f0;
+            --text:         #0f172a;
+            --radius-sm:    8px;
+            --radius-md:    12px;
+            --radius-lg:    16px;
+            --font:         'Noto Nastaliq Urdu', serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font);
+            min-height: 100vh;
+            display: flex;
+            background: #f1f5f9;
+        }
+
+        /* ── Split Layout ── */
+        .login-screen { display: flex; width: 100%; min-height: 100vh; }
+
+        /* Left decorative panel */
+        .login-panel {
+            flex: 1;
+            background: linear-gradient(145deg, #0f172a 0%, #1e3a5f 55%, #1a56db 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 2.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-panel::before {
+            content: '';
+            position: absolute;
+            width: 420px; height: 420px;
+            background: rgba(255,255,255,.03);
+            border-radius: 50%;
+            top: -120px; left: -100px;
+        }
+
+        .login-panel::after {
+            content: '';
+            position: absolute;
+            width: 300px; height: 300px;
+            background: rgba(255,255,255,.03);
+            border-radius: 50%;
+            bottom: -80px; right: -60px;
+        }
+
+        .panel-inner {
+            max-width: 380px;
+            text-align: right;
+            position: relative;
+            z-index: 1;
+        }
+
+        .panel-logo {
+            width: 64px; height: 64px;
+            background: rgba(255,255,255,.12);
+            border: 1.5px solid rgba(255,255,255,.2);
+            border-radius: var(--radius-md);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.8rem;
+            color: #fff;
+            margin-bottom: 1.5rem;
+        }
+
+        .panel-inner h2 {
+            color: #fff;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            line-height: 1.8;
+        }
+
+        .panel-inner p {
+            color: rgba(255,255,255,.6);
+            font-size: .88rem;
+            margin-bottom: 2rem;
+            line-height: 2;
+        }
+
+        .panel-features {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: .65rem;
+        }
+
+        .panel-features li {
+            color: rgba(255,255,255,.8);
+            font-size: .88rem;
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            line-height: 1.8;
+        }
+
+        .panel-features li i { color: #60a5fa; font-size: 1rem; flex-shrink: 0; }
+
+        /* Right form side */
+        .login-form-side {
+            width: 480px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1.5rem;
+            background: #fff;
+        }
+
+        .login-form-wrap { width: 100%; max-width: 380px; }
+
+        /* Mobile logo */
+        .mobile-logo {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .mobile-logo i { font-size: 1.6rem; }
+
+        /* Login Card */
+        .login-card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0,0,0,.08);
+            margin-bottom: 1.25rem;
+        }
+
+        .login-card-header {
+            background: linear-gradient(135deg, #0f172a, #1a56db);
+            padding: 1.75rem;
+            text-align: center;
+        }
+
+        .login-card-header h3 {
+            color: #fff;
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: .3rem;
+            line-height: 1.8;
+        }
+
+        .login-card-header p {
+            color: rgba(255,255,255,.6);
+            font-size: .83rem;
+            line-height: 1.6;
+        }
+
+        .login-card-body { padding: 1.75rem; }
+
+        /* Form elements */
+        .form-group { margin-bottom: 1.15rem; }
+
+        .form-lbl {
+            display: block;
+            font-weight: 600;
+            font-size: .88rem;
+            color: #374151;
+            margin-bottom: .45rem;
+            text-align: right;
+        }
+
+        .input-shell { position: relative; }
+
+        .input-icon {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            font-size: 1rem;
+            pointer-events: none;
+        }
+
+        .form-inp {
+            width: 100%;
+            padding: .72rem 2.6rem .72rem 2.6rem;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: .92rem;
+            color: var(--text);
+            background: #f8fafc;
+            text-align: right;
+            outline: none;
+            transition: border-color .2s, box-shadow .2s;
+        }
+
+        .form-inp:focus {
+            border-color: var(--primary);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(26,86,219,.12);
+        }
+
+        .eye-toggle {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            padding: .25rem .4rem;
+            border-radius: 4px;
+            transition: color .15s;
+        }
+        .eye-toggle:hover { color: var(--primary); }
+
+        /* Alert */
+        .login-alert {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: var(--radius-sm);
+            padding: .7rem 1rem;
+            font-size: .85rem;
+            color: #dc2626;
+            margin-bottom: 1.15rem;
+            text-align: right;
+            line-height: 1.8;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+        }
+
+        /* Submit button */
+        .btn-signin {
+            width: 100%;
+            padding: .8rem;
+            background: linear-gradient(135deg, #1a56db, #1e3a5f);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: .5rem;
+            line-height: 1.8;
+            transition: opacity .2s, transform .1s;
+        }
+        .btn-signin:hover { opacity: .92; }
+        .btn-signin:active { transform: scale(.98); }
+
+        /* Footer text */
+        .login-footer-text {
+            text-align: center;
+            font-size: .78rem;
+            color: #94a3b8;
+            line-height: 1.8;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 991.98px) {
+            .login-panel { display: none; }
+            .login-form-side { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-screen">
+
+    <!-- Decorative left panel -->
+    <div class="login-panel">
+        <div class="panel-inner">
+            <div class="panel-logo">
+                <i class="bi bi-boxes"></i>
+            </div>
+            <h2>اسٹاک مینجمنٹ سسٹم</h2>
+            <p>مال کا اندراج، اخراج، سپلائرز، گاہک اور کیش بک — سب ایک جگہ۔</p>
+            <ul class="panel-features">
+                <li><i class="bi bi-check2-circle"></i>اندراجِ مال و اخراجِ مال</li>
+                <li><i class="bi bi-check2-circle"></i>سپلائرز اور گاہک کے کھاتے</li>
+                <li><i class="bi bi-check2-circle"></i>کیش بک اور حسابات</li>
+                <li><i class="bi bi-check2-circle"></i>مکمل اردو انٹرفیس</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Form side -->
+    <div class="login-form-side">
+        <div class="login-form-wrap">
+
+            <!-- Mobile logo -->
+            <div class="mobile-logo d-lg-none">
+                <i class="bi bi-boxes"></i>
+                <span>اسٹاک سسٹم</span>
+            </div>
+
+            <div class="login-card">
+                <div class="login-card-header">
+                    <h3>لاگ ان کریں</h3>
+                    <p>اپنی اسناد درج کریں</p>
+                </div>
+
+                <div class="login-card-body">
+
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="login-alert">
+                                    <i class="bi bi-exclamation-circle-fill"></i>
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST" action="{{ url_for('auth.login') }}">
+
+                        <div class="form-group">
+                            <label class="form-lbl" for="username">یوزر نیم</label>
+                            <div class="input-shell">
+                                <span class="input-icon"><i class="bi bi-person"></i></span>
+                                <input type="text"
+                                       id="username"
+                                       name="username"
+                                       class="form-inp"
+                                       placeholder="اپنا یوزر نیم لکھیں"
+                                       required autofocus
+                                       autocomplete="username">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-lbl" for="password">پاس ورڈ</label>
+                            <div class="input-shell">
+                                <span class="input-icon"><i class="bi bi-lock"></i></span>
+                                <input type="password"
+                                       id="password"
+                                       name="password"
+                                       class="form-inp"
+                                       placeholder="••••••••"
+                                       required
+                                       autocomplete="current-password">
+                                <button type="button" class="eye-toggle"
+                                        onclick="togglePassword()"
+                                        aria-label="پاس ورڈ دکھائیں">
+                                    <i class="bi bi-eye" id="eyeIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-signin">
+                            <i class="bi bi-box-arrow-in-left"></i>
+                            لاگ ان
+                        </button>
+
+                    </form>
+                </div>
+            </div>
+
+            <p class="login-footer-text">اسٹاک مینجمنٹ سسٹم &copy; 2026</p>
+
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function togglePassword() {
+        const field = document.getElementById('password');
+        const icon  = document.getElementById('eyeIcon');
+        if (field.type === 'password') {
+            field.type = 'text';
+            icon.classList.replace('bi-eye', 'bi-eye-slash');
+        } else {
+            field.type = 'password';
+            icon.classList.replace('bi-eye-slash', 'bi-eye');
+        }
+    }
+</script>
+</body>
+</html>

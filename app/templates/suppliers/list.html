@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}سپلائرز کی فہرست — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block page_title %}سپلائرز پروفائل مینجمنٹ{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0 text-end" dir="rtl">
+
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-truck text-primary me-2"></i> رجسٹرڈ سپلائرز کی تفصیلات
+        </h5>
+        <a href="{{ url_for('supplier_bp.add_supplier') }}" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2">
+            <i class="bi bi-plus-circle"></i> <span>نیا سپلائر شامل کریں</span>
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header fw-bold text-slate-800">
+            سپلائرز کا ریکارڈ (کھاتا جات)
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">آئی ڈی</th>
+                        <th>سپلائر کا نام</th>
+                        <th>فون نمبر</th>
+                        <th>پتہ / ایڈریس</th>
+                        <th>ابتدائی بیلنس</th>
+                        <th>موجودہ بیلنس</th>
+                        <th style="width: 120px; text-align: center;">ایکشنز</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if suppliers %}
+                        {% for s in suppliers %}
+                        <tr>
+                            <td class="fw-bold text-muted">#{{ s.id }}</td>
+                            <td class="fw-bold text-dark">{{ s.name }}</td>
+                            <td class="text-secondary">{{ s.phone if s.phone else '—' }}</td>
+                            <td class="text-secondary">{{ s.address if s.address else '—' }}</td>
+                            <td class="text-primary fw-medium">{{ "{:,.2f}".format(s.opening_balance) }} روپے</td>
+                            <td class="fw-bold {% if s.current_balance > 0 %}text-danger{% else %}text-success{% endif %}">
+                                {{ "{:,.2f}".format(s.current_balance) }} روپے
+                            </td>
+                           <td>
+    <div class="d-flex justify-content-center gap-2">
+        <a href="{{ url_for('supplier_bp.edit_supplier', supplier_id=s.id) }}" class="btn btn-sm btn-outline-primary py-1 px-2" title="تبدیل کریں">
+            <i class="bi bi-pencil-square"></i>
+        </a>
+
+        <form action="{{ url_for('supplier_bp.delete_supplier', supplier_id=s.id) }}" method="POST" onsubmit="return confirm('کیا آپ واقعی اس سپلائر کا ریکارڈ ختم کرنا چاہتے ہیں؟');" style="display:inline;">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2" title="خاتمہ کریں">
+                <i class="bi bi-trash"></i>
+            </button>
+        </form>
+    </div>
+</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="bi bi-people text-muted" style="font-size: 2.5rem;"></i>
+                                <p class="mt-2 mb-0 fw-medium">سسٹم میں ابھی تک کوئی سپلائر شامل نہیں کیا گیا۔</p>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
