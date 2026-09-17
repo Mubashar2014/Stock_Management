@@ -32,7 +32,7 @@ def create_app():
     from app.stock_in.routes import stock_in_bp
     from app.stock_out.routes import stock_out_bp
     from app.cashbook.routes import cashbook_bp
-
+    from app.khata.routes import khata_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(suppliers_bp, url_prefix='/suppliers', name='supplier_bp')
@@ -41,6 +41,7 @@ def create_app():
     app.register_blueprint(stock_in_bp, url_prefix='/stock-in', name='stock_in')
     app.register_blueprint(stock_out_bp, url_prefix='/stock-out', name='stock_out')
     app.register_blueprint(cashbook_bp, url_prefix='/cashbook', name='cashbook')
+    app.register_blueprint(khata_bp, url_prefix='/khata', name='khata')
 
     @app.route('/')
     def index():

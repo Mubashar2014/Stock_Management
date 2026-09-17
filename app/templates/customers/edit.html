@@ -1,41 +1,58 @@
 {% extends 'base.html' %}
-{% block title %}گاہک کا ریکارڈ تبدیل کریں — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block title %}گاہک ترمیم — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block nav_icon %}person-fill-gear{% endblock %}
 {% block page_title %}گاہک ریکارڈ ترمیم{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-0 text-end" dir="rtl">
-    <div class="mb-4">
-        <a href="{{ url_for('customer_bp.list_customers') }}" class="btn btn-light border d-inline-flex align-items-center gap-2 text-secondary">
-            <i class="bi bi-arrow-right"></i> <span>فهرست میں واپس جائیں</span>
+<div dir="rtl">
+    <div class="mb-3">
+        <a href="{{ url_for('customer_bp.list_customers') }}" class="btn-back">
+            <i class="bi bi-arrow-right"></i> گاہکوں کی فہرست
         </a>
     </div>
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white fw-bold text-dark py-3"><i class="bi bi-pencil-square text-primary me-1"></i> گاہک کی معلومات تبدیل کریں</div>
+            <div class="card">
+                <div class="card-header ch-brand d-flex align-items-center gap-2">
+                    <i class="bi bi-pencil-fill"></i>
+                    <span>گاہک کی معلومات تبدیل کریں — {{ customer.name }}</span>
+                </div>
                 <div class="card-body p-4">
                     <form method="POST" action="{{ url_for('customer_bp.edit_customer', customer_id=customer.id) }}">
+
                         <div class="mb-3">
-                            <label for="name" class="form-label mb-2">گاہک کا نام <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="name" name="name" value="{{ customer.name }}" required>
+                            <label class="form-label">گاہک کا نام <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control"
+                                   value="{{ customer.name }}" required>
                         </div>
+
                         <div class="mb-3">
-                            <label for="phone" class="form-label mb-2">فون نمبر / موبائل</label>
-                            <input type="text" class="form-control text-start" id="phone" name="phone" value="{{ customer.phone if customer.phone else '' }}" dir="ltr">
+                            <label class="form-label">فون نمبر / موبائل</label>
+                            <input type="text" name="phone" class="form-control"
+                                   value="{{ customer.phone or '' }}" dir="ltr" style="text-align:left;">
                         </div>
+
                         <div class="mb-3">
-                            <label for="address" class="form-label mb-2">پتہ (Address)</label>
-                            <input type="text" class="form-control" id="address" name="address" value="{{ customer.address if customer.address else '' }}">
+                            <label class="form-label">پتہ / ایڈریس</label>
+                            <input type="text" name="address" class="form-control"
+                                   value="{{ customer.address or '' }}">
                         </div>
+
                         <div class="mb-4">
-                            <label for="opening_balance" class="form-label mb-2">ابتدائی بقایا رقم / سابقہ کھاتا</label>
+                            <label class="form-label">ابتدائی بیلنس (Opening Balance)</label>
                             <div class="input-group">
                                 <span class="input-group-text">روپے</span>
-                                <input type="number" step="0.01" class="form-control text-start" id="opening_balance" name="opening_balance" value="{{ customer.opening_balance }}" dir="ltr">
+                                <input type="number" step="0.01" name="opening_balance"
+                                       class="form-control" value="{{ customer.opening_balance }}"
+                                       dir="ltr" style="text-align:left;">
                             </div>
+                            <div class="form-text">تبدیلی موجودہ بیلنس میں خودکار ایڈجسٹ ہو گی</div>
                         </div>
-                        <div class="d-grid mt-4">
-                            <button type="submit" class="btn btn-primary py-2.5 fw-bold fs-6"><i class="bi bi-check-circle me-1"></i> تبدیلیاں محفوظ کریں</button>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-warning text-dark py-2 fw-bold">
+                                <i class="bi bi-arrow-clockwise me-1"></i> تبدیلیاں محفوظ کریں
+                            </button>
                         </div>
                     </form>
                 </div>

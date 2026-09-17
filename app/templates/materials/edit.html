@@ -1,38 +1,53 @@
 {% extends 'base.html' %}
-{% block title %}مٹیریل تبدیل کریں — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block title %}مٹیریل ترمیم — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block nav_icon %}box-seam-fill{% endblock %}
 {% block page_title %}مٹیریل ریکارڈ ترمیم{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-0 text-end" dir="rtl">
-    <div class="mb-4">
-        <a href="{{ url_for('material_bp.list_materials') }}" class="btn btn-light border d-inline-flex align-items-center gap-2 text-secondary">
-            <i class="bi bi-arrow-right"></i> <span>فہرست میں واپس جائیں</span>
+<div dir="rtl">
+    <div class="mb-3">
+        <a href="{{ url_for('material_bp.list_materials') }}" class="btn-back">
+            <i class="bi bi-arrow-right"></i> مٹیریلز کی فہرست
         </a>
     </div>
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white fw-bold text-dark py-3"><i class="bi bi-pencil-square text-primary me-1"></i> مٹیریل کی معلومات تبدیل کریں</div>
+            <div class="card">
+                <div class="card-header ch-brand d-flex align-items-center gap-2">
+                    <i class="bi bi-pencil-fill"></i>
+                    <span>مٹیریل تبدیل کریں — {{ material.name }}</span>
+                </div>
                 <div class="card-body p-4">
-                    <form method="POST" action="{{ url_for('material_bp.edit_material', material_id=material.id) }}" enctype="multipart/form-data">
+                    <form method="POST" action="{{ url_for('material_bp.edit_material', material_id=material.id) }}"
+                          enctype="multipart/form-data">
+
                         <div class="mb-3">
-                            <label for="name" class="form-label mb-2">مٹیریل کا نام <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="name" name="name" value="{{ material.name }}" required>
+                            <label class="form-label">مٹیریل کا نام <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control"
+                                   value="{{ material.name }}" required>
                         </div>
+
                         <div class="mb-3">
-                            <label for="unit" class="form-label mb-2">پیمائش کی اکائی (Unit) <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="unit" name="unit" value="{{ material.unit }}" required>
+                            <label class="form-label">پیمائش کی اکائی (Unit) <span class="text-danger">*</span></label>
+                            <input type="text" name="unit" class="form-control"
+                                   value="{{ material.unit }}" required>
                         </div>
+
                         <div class="mb-3">
-                            <label for="image" class="form-label mb-2">تصویر تبدیل کریں (اگر کرنا چاہیں)</label>
-                            <input type="file" class="form-control text-start" id="image" name="image" accept="image/*" dir="ltr">
+                            <label class="form-label">تصویر تبدیل کریں (اختیاری)</label>
+                            <input type="file" name="image" class="form-control"
+                                   accept="image/*" dir="ltr" style="text-align:left;">
                         </div>
+
                         <div class="mb-4">
-                            <label for="description" class="form-label mb-2">تفصیل</label>
-                            <textarea class="form-control" id="description" name="description" rows="3">{{ material.description if material.description else '' }}</textarea>
+                            <label class="form-label">تفصیل</label>
+                            <textarea name="description" class="form-control" rows="3">{{ material.description or '' }}</textarea>
                         </div>
-                        <div class="d-grid mt-4">
-                            <button type="submit" class="btn btn-primary py-2.5 fw-bold fs-6"><i class="bi bi-check-circle me-1"></i> تبدیلیاں محفوظ کریں</button>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-warning text-dark py-2 fw-bold">
+                                <i class="bi bi-arrow-clockwise me-1"></i> تبدیلیاں محفوظ کریں
+                            </button>
                         </div>
                     </form>
                 </div>

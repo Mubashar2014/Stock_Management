@@ -4,42 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لاگ ان — اسٹاک مینجمنٹ سسٹم</title>
-
-    <!-- Bootstrap 5 RTL -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <!-- Noto Nastaliq Urdu -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
-
     <style>
         :root {
-            --primary:      #1a56db;
-            --primary-dark: #1e3a5f;
-            --border:       #e2e8f0;
-            --text:         #0f172a;
-            --radius-sm:    8px;
-            --radius-md:    12px;
-            --radius-lg:    16px;
-            --font:         'Noto Nastaliq Urdu', serif;
+            --brand:       #0f766e;
+            --brand-dark:  #0d5e57;
+            --brand-deeper:#042f2e;
+            --brand-mid:   #5eead4;
+            --brand-light: #f0fdfa;
+            --border:      #e2e8f0;
+            --text:        #0f172a;
+            --font:        'Noto Nastaliq Urdu', serif;
         }
-
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
         body {
             font-family: var(--font);
             min-height: 100vh;
+            background: #f0fdfa;
             display: flex;
-            background: #f1f5f9;
+            align-items: stretch;
         }
 
         /* ── Split Layout ── */
         .login-screen { display: flex; width: 100%; min-height: 100vh; }
 
-        /* Left decorative panel */
-        .login-panel {
+        /* Decorative panel */
+        .deco-panel {
             flex: 1;
-            background: linear-gradient(145deg, #0f172a 0%, #1e3a5f 55%, #1a56db 100%);
+            background: linear-gradient(160deg, var(--brand-deeper) 0%, #0d4f4a 45%, var(--brand) 100%);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -47,355 +41,365 @@
             position: relative;
             overflow: hidden;
         }
-
-        .login-panel::before {
+        .deco-panel::before {
             content: '';
             position: absolute;
-            width: 420px; height: 420px;
-            background: rgba(255,255,255,.03);
-            border-radius: 50%;
-            top: -120px; left: -100px;
+            width: 480px; height: 480px;
+            background: radial-gradient(circle, rgba(94,234,212,.12) 0%, transparent 70%);
+            top: -120px; left: -80px;
         }
-
-        .login-panel::after {
+        .deco-panel::after {
             content: '';
             position: absolute;
-            width: 300px; height: 300px;
-            background: rgba(255,255,255,.03);
-            border-radius: 50%;
-            bottom: -80px; right: -60px;
+            width: 320px; height: 320px;
+            background: radial-gradient(circle, rgba(94,234,212,.08) 0%, transparent 70%);
+            bottom: -60px; right: -40px;
         }
+        /* Floating shapes */
+        .deco-shape {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255,255,255,.04);
+        }
+        .deco-shape-1 { width: 200px; height: 200px; top: 15%; right: 10%; }
+        .deco-shape-2 { width: 120px; height: 120px; bottom: 20%; left: 15%; }
+        .deco-shape-3 { width: 60px;  height: 60px;  top: 60%;  right: 25%; }
 
-        .panel-inner {
-            max-width: 380px;
+        .deco-inner {
+            max-width: 390px;
             text-align: right;
             position: relative;
             z-index: 1;
         }
-
-        .panel-logo {
-            width: 64px; height: 64px;
-            background: rgba(255,255,255,.12);
-            border: 1.5px solid rgba(255,255,255,.2);
-            border-radius: var(--radius-md);
+        .deco-logo {
+            width: 68px; height: 68px;
+            background: rgba(255,255,255,.1);
+            border: 1.5px solid rgba(255,255,255,.18);
+            border-radius: 16px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 1.8rem;
-            color: #fff;
-            margin-bottom: 1.5rem;
+            font-size: 1.9rem;
+            color: var(--brand-mid);
+            margin-bottom: 1.75rem;
+            backdrop-filter: blur(4px);
         }
-
-        .panel-inner h2 {
+        .deco-inner h2 {
             color: #fff;
-            font-size: 1.5rem;
+            font-size: 1.55rem;
             font-weight: 700;
-            margin-bottom: 1rem;
-            line-height: 1.8;
+            margin-bottom: .9rem;
+            line-height: 1.7;
         }
-
-        .panel-inner p {
-            color: rgba(255,255,255,.6);
+        .deco-inner p {
+            color: rgba(255,255,255,.55);
             font-size: .88rem;
-            margin-bottom: 2rem;
+            margin-bottom: 2.25rem;
             line-height: 2;
         }
-
-        .panel-features {
+        .feature-list {
             list-style: none;
             display: flex;
             flex-direction: column;
-            gap: .65rem;
+            gap: .7rem;
         }
-
-        .panel-features li {
-            color: rgba(255,255,255,.8);
-            font-size: .88rem;
+        .feature-list li {
             display: flex;
             align-items: center;
-            gap: .65rem;
+            gap: .75rem;
+            color: rgba(255,255,255,.8);
+            font-size: .88rem;
             line-height: 1.8;
         }
+        .feature-list li .fi {
+            width: 28px; height: 28px;
+            background: rgba(94,234,212,.15);
+            border: 1px solid rgba(94,234,212,.25);
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--brand-mid);
+            font-size: .85rem;
+            flex-shrink: 0;
+        }
+        /* Stats row */
+        .deco-stats {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        .deco-stat {
+            background: rgba(255,255,255,.07);
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 10px;
+            padding: .65rem .9rem;
+            flex: 1;
+            text-align: center;
+        }
+        .deco-stat .sv { font-size: 1.2rem; font-weight: 700; color: var(--brand-mid); line-height: 1.4; }
+        .deco-stat .sl { font-size: .72rem; color: rgba(255,255,255,.5); line-height: 1.6; }
 
-        .panel-features li i { color: #60a5fa; font-size: 1rem; flex-shrink: 0; }
-
-        /* Right form side */
-        .login-form-side {
-            width: 480px;
+        /* Form side */
+        .form-side {
+            width: 460px;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2rem 1.5rem;
+            padding: 2.5rem 1.75rem;
             background: #fff;
         }
-
-        .login-form-wrap { width: 100%; max-width: 380px; }
+        .form-wrap { width: 100%; max-width: 370px; }
 
         /* Mobile logo */
         .mobile-logo {
             display: flex;
             align-items: center;
-            gap: .75rem;
             justify-content: center;
+            gap: .75rem;
             margin-bottom: 2rem;
-            font-size: 1.2rem;
+            color: var(--brand);
+            font-size: 1.15rem;
             font-weight: 700;
-            color: var(--primary);
         }
-        .mobile-logo i { font-size: 1.6rem; }
+        .mobile-logo i { font-size: 1.75rem; }
 
-        /* Login Card */
+        /* Login card */
         .login-card {
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 24px rgba(0,0,0,.08);
+            box-shadow: 0 8px 32px rgba(15,118,110,.12), 0 2px 8px rgba(0,0,0,.06);
+            border: 1px solid #e2e8f0;
             margin-bottom: 1.25rem;
         }
-
-        .login-card-header {
-            background: linear-gradient(135deg, #0f172a, #1a56db);
-            padding: 1.75rem;
+        .lc-head {
+            background: linear-gradient(135deg, var(--brand-deeper) 0%, var(--brand) 100%);
+            padding: 1.85rem 1.75rem;
             text-align: center;
+            position: relative;
+            overflow: hidden;
         }
+        .lc-head::before {
+            content: '';
+            position: absolute;
+            width: 180px; height: 180px;
+            background: radial-gradient(circle, rgba(94,234,212,.15), transparent 70%);
+            top: -60px; left: -40px;
+        }
+        .lc-head-icon {
+            width: 52px; height: 52px;
+            background: rgba(255,255,255,.12);
+            border: 1px solid rgba(255,255,255,.2);
+            border-radius: 12px;
+            margin: 0 auto .85rem;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.45rem;
+            color: var(--brand-mid);
+            position: relative; z-index: 1;
+        }
+        .lc-head h3 { color: #fff; font-size: 1.25rem; font-weight: 700; margin-bottom: .2rem; line-height: 1.7; position: relative; z-index: 1; }
+        .lc-head p  { color: rgba(255,255,255,.55); font-size: .82rem; line-height: 1.6; margin: 0; position: relative; z-index: 1; }
+        .lc-body { padding: 1.75rem; }
 
-        .login-card-header h3 {
-            color: #fff;
-            font-size: 1.3rem;
-            font-weight: 700;
-            margin-bottom: .3rem;
+        /* Error alert */
+        .err-alert {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: .7rem 1rem;
+            font-size: .85rem;
+            color: #dc2626;
+            margin-bottom: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
             line-height: 1.8;
         }
 
-        .login-card-header p {
-            color: rgba(255,255,255,.6);
-            font-size: .83rem;
-            line-height: 1.6;
-        }
-
-        .login-card-body { padding: 1.75rem; }
-
-        /* Form elements */
-        .form-group { margin-bottom: 1.15rem; }
-
-        .form-lbl {
+        /* Form fields */
+        .field { margin-bottom: 1.1rem; }
+        .field-label {
             display: block;
             font-weight: 600;
-            font-size: .88rem;
+            font-size: .87rem;
             color: #374151;
-            margin-bottom: .45rem;
+            margin-bottom: .4rem;
             text-align: right;
         }
-
-        .input-shell { position: relative; }
-
-        .input-icon {
+        .field-wrap { position: relative; }
+        .field-icon {
             position: absolute;
-            right: 14px;
-            top: 50%;
-            transform: translateY(-50%);
+            right: 13px;
+            top: 50%; transform: translateY(-50%);
             color: #9ca3af;
-            font-size: 1rem;
+            font-size: .95rem;
             pointer-events: none;
         }
-
-        .form-inp {
+        .field-inp {
             width: 100%;
-            padding: .72rem 2.6rem .72rem 2.6rem;
-            border: 1.5px solid var(--border);
-            border-radius: var(--radius-sm);
+            padding: .72rem 2.5rem .72rem 2.75rem;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
             font-family: var(--font);
-            font-size: .92rem;
+            font-size: .91rem;
             color: var(--text);
             background: #f8fafc;
             text-align: right;
             outline: none;
-            transition: border-color .2s, box-shadow .2s;
+            transition: border-color .18s, box-shadow .18s, background .18s;
         }
-
-        .form-inp:focus {
-            border-color: var(--primary);
+        .field-inp:focus {
+            border-color: var(--brand);
             background: #fff;
-            box-shadow: 0 0 0 3px rgba(26,86,219,.12);
+            box-shadow: 0 0 0 3px rgba(15,118,110,.14);
         }
-
-        .eye-toggle {
+        .eye-btn {
             position: absolute;
-            left: 10px;
-            top: 50%;
+            left: 10px; top: 50%;
             transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #9ca3af;
-            cursor: pointer;
-            padding: .25rem .4rem;
+            background: none; border: none;
+            color: #9ca3af; cursor: pointer;
+            padding: .25rem .35rem;
             border-radius: 4px;
             transition: color .15s;
+            line-height: 1;
         }
-        .eye-toggle:hover { color: var(--primary); }
+        .eye-btn:hover { color: var(--brand); }
 
-        /* Alert */
-        .login-alert {
-            background: #fef2f2;
-            border: 1px solid #fecaca;
-            border-radius: var(--radius-sm);
-            padding: .7rem 1rem;
-            font-size: .85rem;
-            color: #dc2626;
-            margin-bottom: 1.15rem;
-            text-align: right;
-            line-height: 1.8;
-            display: flex;
-            align-items: center;
-            gap: .5rem;
-        }
-
-        /* Submit button */
-        .btn-signin {
+        /* Submit */
+        .btn-login {
             width: 100%;
-            padding: .8rem;
-            background: linear-gradient(135deg, #1a56db, #1e3a5f);
+            padding: .82rem;
+            background: linear-gradient(135deg, var(--brand), var(--brand-dark));
             color: #fff;
             border: none;
-            border-radius: var(--radius-sm);
+            border-radius: 8px;
             font-family: var(--font);
             font-size: 1rem;
             font-weight: 700;
             cursor: pointer;
-            margin-top: .5rem;
+            margin-top: .4rem;
             line-height: 1.8;
-            transition: opacity .2s, transform .1s;
+            transition: opacity .18s, transform .1s, box-shadow .18s;
+            box-shadow: 0 4px 14px rgba(15,118,110,.3);
         }
-        .btn-signin:hover { opacity: .92; }
-        .btn-signin:active { transform: scale(.98); }
+        .btn-login:hover { opacity: .92; box-shadow: 0 6px 20px rgba(15,118,110,.4); }
+        .btn-login:active { transform: scale(.98); }
 
-        /* Footer text */
-        .login-footer-text {
-            text-align: center;
-            font-size: .78rem;
-            color: #94a3b8;
-            line-height: 1.8;
-        }
+        /* Footer */
+        .login-foot { text-align: center; font-size: .77rem; color: #94a3b8; line-height: 1.8; }
 
-        /* ── Responsive ── */
         @media (max-width: 991.98px) {
-            .login-panel { display: none; }
-            .login-form-side { width: 100%; }
+            .deco-panel { display: none; }
+            .form-side { width: 100%; }
         }
     </style>
 </head>
 <body>
-
 <div class="login-screen">
 
-    <!-- Decorative left panel -->
-    <div class="login-panel">
-        <div class="panel-inner">
-            <div class="panel-logo">
-                <i class="bi bi-boxes"></i>
-            </div>
+    <!-- Decorative panel -->
+    <div class="deco-panel">
+        <div class="deco-shape deco-shape-1"></div>
+        <div class="deco-shape deco-shape-2"></div>
+        <div class="deco-shape deco-shape-3"></div>
+        <div class="deco-inner">
+            <div class="deco-logo"><i class="bi bi-boxes"></i></div>
             <h2>اسٹاک مینجمنٹ سسٹم</h2>
-            <p>مال کا اندراج، اخراج، سپلائرز، گاہک اور کیش بک — سب ایک جگہ۔</p>
-            <ul class="panel-features">
-                <li><i class="bi bi-check2-circle"></i>اندراجِ مال و اخراجِ مال</li>
-                <li><i class="bi bi-check2-circle"></i>سپلائرز اور گاہک کے کھاتے</li>
-                <li><i class="bi bi-check2-circle"></i>کیش بک اور حسابات</li>
-                <li><i class="bi bi-check2-circle"></i>مکمل اردو انٹرفیس</li>
+            <p>مال کا اندراج، سپلائرز، گاہک، کھاتا بک اور کیش بک — سب ایک جگہ منظم۔</p>
+            <ul class="feature-list">
+                <li><div class="fi"><i class="bi bi-box-seam-fill"></i></div><span>مٹیریل اسٹاک کا مکمل حساب</span></li>
+                <li><div class="fi"><i class="bi bi-truck"></i></div><span>سپلائرز اور گاہک کے کھاتے</span></li>
+                <li><div class="fi"><i class="bi bi-journal-bookmark-fill"></i></div><span>کھاتا بک اور کیش بک</span></li>
+                <li><div class="fi"><i class="bi bi-printer-fill"></i></div><span>پرنٹ اور واٹس ایپ شیئر</span></li>
             </ul>
+            <div class="deco-stats">
+                <div class="deco-stat"><div class="sv">100%</div><div class="sl">اردو انٹرفیس</div></div>
+                <div class="deco-stat"><div class="sv">لائیو</div><div class="sl">اسٹاک اپڈیٹ</div></div>
+                <div class="deco-stat"><div class="sv">محفوظ</div><div class="sl">ڈیٹا سیکیورٹی</div></div>
+            </div>
         </div>
     </div>
 
     <!-- Form side -->
-    <div class="login-form-side">
-        <div class="login-form-wrap">
+    <div class="form-side">
+        <div class="form-wrap">
 
-            <!-- Mobile logo -->
             <div class="mobile-logo d-lg-none">
                 <i class="bi bi-boxes"></i>
                 <span>اسٹاک سسٹم</span>
             </div>
 
             <div class="login-card">
-                <div class="login-card-header">
+                <div class="lc-head">
+                    <div class="lc-head-icon"><i class="bi bi-shield-lock-fill"></i></div>
                     <h3>لاگ ان کریں</h3>
-                    <p>اپنی اسناد درج کریں</p>
+                    <p>اپنی اسناد درج کر کے سسٹم میں داخل ہوں</p>
                 </div>
-
-                <div class="login-card-body">
+                <div class="lc-body">
 
                     {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}
                             {% for category, message in messages %}
-                                <div class="login-alert">
-                                    <i class="bi bi-exclamation-circle-fill"></i>
-                                    {{ message }}
-                                </div>
+                            <div class="err-alert">
+                                <i class="bi bi-exclamation-circle-fill"></i>
+                                {{ message }}
+                            </div>
                             {% endfor %}
                         {% endif %}
                     {% endwith %}
 
                     <form method="POST" action="{{ url_for('auth.login') }}">
-
-                        <div class="form-group">
-                            <label class="form-lbl" for="username">یوزر نیم</label>
-                            <div class="input-shell">
-                                <span class="input-icon"><i class="bi bi-person"></i></span>
-                                <input type="text"
-                                       id="username"
-                                       name="username"
-                                       class="form-inp"
-                                       placeholder="اپنا یوزر نیم لکھیں"
-                                       required autofocus
-                                       autocomplete="username">
+                        <div class="field">
+                            <label class="field-label" for="username">
+                                <i class="bi bi-person me-1"></i>یوزر نیم
+                            </label>
+                            <div class="field-wrap">
+                                <span class="field-icon"><i class="bi bi-person"></i></span>
+                                <input type="text" id="username" name="username"
+                                       class="field-inp"
+                                       placeholder="یوزر نیم درج کریں"
+                                       required autofocus autocomplete="username">
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label class="form-lbl" for="password">پاس ورڈ</label>
-                            <div class="input-shell">
-                                <span class="input-icon"><i class="bi bi-lock"></i></span>
-                                <input type="password"
-                                       id="password"
-                                       name="password"
-                                       class="form-inp"
+                        <div class="field">
+                            <label class="field-label" for="password">
+                                <i class="bi bi-lock me-1"></i>پاس ورڈ
+                            </label>
+                            <div class="field-wrap">
+                                <span class="field-icon"><i class="bi bi-lock"></i></span>
+                                <input type="password" id="password" name="password"
+                                       class="field-inp"
                                        placeholder="••••••••"
-                                       required
-                                       autocomplete="current-password">
-                                <button type="button" class="eye-toggle"
-                                        onclick="togglePassword()"
-                                        aria-label="پاس ورڈ دکھائیں">
+                                       required autocomplete="current-password">
+                                <button type="button" class="eye-btn" onclick="togglePwd()" aria-label="پاس ورڈ دکھائیں">
                                     <i class="bi bi-eye" id="eyeIcon"></i>
                                 </button>
                             </div>
                         </div>
 
-                        <button type="submit" class="btn-signin">
-                            <i class="bi bi-box-arrow-in-left"></i>
+                        <button type="submit" class="btn-login">
+                            <i class="bi bi-box-arrow-in-left me-1"></i>
                             لاگ ان
                         </button>
-
                     </form>
                 </div>
             </div>
 
-            <p class="login-footer-text">اسٹاک مینجمنٹ سسٹم &copy; 2026</p>
-
+            <p class="login-foot">اسٹاک مینجمنٹ سسٹم &copy; 2026 — تمام حقوق محفوظ ہیں</p>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    function togglePassword() {
-        const field = document.getElementById('password');
-        const icon  = document.getElementById('eyeIcon');
-        if (field.type === 'password') {
-            field.type = 'text';
-            icon.classList.replace('bi-eye', 'bi-eye-slash');
-        } else {
-            field.type = 'password';
-            icon.classList.replace('bi-eye-slash', 'bi-eye');
-        }
+function togglePwd() {
+    const f = document.getElementById('password');
+    const i = document.getElementById('eyeIcon');
+    if (f.type === 'password') {
+        f.type = 'text';
+        i.className = 'bi bi-eye-slash';
+    } else {
+        f.type = 'password';
+        i.className = 'bi bi-eye';
     }
+}
 </script>
 </body>
 </html>

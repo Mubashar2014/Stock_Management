@@ -1,48 +1,69 @@
 {% extends 'base.html' %}
-{% block title %}گاہکوں کی فہرست — اسٹاک مینجمنٹ سسٹم{% endblock %}
-{% block page_title %}گاہک (Customers) مینجمنٹ{% endblock %}
+{% block title %}گاہک — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block nav_icon %}person-check-fill{% endblock %}
+{% block page_title %}گاہک مینجمنٹ{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-0 text-end" dir="rtl">
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-        <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-people text-primary me-2"></i> رجسٹرڈ گاہکوں کی تفصیلات</h5>
-        <a href="{{ url_for('customer_bp.add_customer') }}" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2">
-            <i class="bi bi-plus-circle"></i> <span>نیا گاہک شامل کریں</span>
+<div dir="rtl">
+    <div class="section-heading">
+        <h5><i class="bi bi-people-fill me-2" style="color:var(--brand);"></i>رجسٹرڈ گاہکوں کی فہرست</h5>
+        <a href="{{ url_for('customer_bp.add_customer') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
+            <i class="bi bi-plus-circle-fill"></i><span>نیا گاہک</span>
         </a>
     </div>
 
     <div class="card">
-        <div class="card-header fw-bold text-slate-800">گاہکوں کا ریکارڈ (کھاتا جات)</div>
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table align-middle mb-0">
                 <thead>
                     <tr>
-                        <th style="width: 80px;">آئی ڈی</th>
+                        <th>#</th>
                         <th>گاہک کا نام</th>
                         <th>فون نمبر</th>
-                        <th>پتہ / ایڈریس</th>
+                        <th>پتہ</th>
                         <th>ابتدائی بیلنس</th>
                         <th>موجودہ بیلنس</th>
-                        <th style="width: 120px; text-align: center;">ایکشنز</th>
+                        <th class="text-center">ایکشن</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% if customers %}
                         {% for c in customers %}
                         <tr>
-                            <td class="fw-bold text-muted">#{{ c.id }}</td>
-                            <td class="fw-bold text-dark">{{ c.name }}</td>
-                            <td class="text-secondary">{{ c.phone if c.phone else '—' }}</td>
-                            <td class="text-secondary">{{ c.address if c.address else '—' }}</td>
-                            <td class="text-primary fw-medium">{{ "{:,.2f}".format(c.opening_balance) }} روپے</td>
-                            <td class="fw-bold {% if c.current_balance > 0 %}text-success{% else %}text-muted{% endif %}">
-                                {{ "{:,.2f}".format(c.current_balance) }} روپے
+                            <td class="text-muted fw-semibold" style="font-size:.82rem;">#{{ c.id }}</td>
+                            <td class="fw-bold">{{ c.name }}</td>
+                            <td>
+                                {% if c.phone %}
+                                <span class="badge badge-slate" dir="ltr">{{ c.phone }}</span>
+                                {% else %}<span class="text-muted">—</span>{% endif %}
+                            </td>
+                            <td class="text-muted" style="font-size:.88rem;">{{ c.address or '—' }}</td>
+                            <td class="fw-semibold" style="direction:ltr;text-align:left;">{{ "{:,.2f}".format(c.opening_balance) }}</td>
+                            <td>
+                                <span class="fw-bold {% if c.current_balance > 0 %}text-danger{% else %}text-success{% endif %}"
+                                      style="direction:ltr;display:inline-block;">
+                                    {{ "{:,.2f}".format(c.current_balance) }}
+                                </span>
+                                {% if c.current_balance > 0 %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1" style="font-size:.7rem;">واجب</span>
+                                {% endif %}
                             </td>
                             <td>
-                                <div class="d-flex justify-content-center gap-2">
-                                    <a href="{{ url_for('customer_bp.edit_customer', customer_id=c.id) }}" class="btn btn-sm btn-outline-primary py-1 px-2"><i class="bi bi-pencil-square"></i></a>
-                                    <form action="{{ url_for('customer_bp.delete_customer', customer_id=c.id) }}" method="POST" onsubmit="return confirm('کیا آپ واقعی اس گاہک کا ریکارڈ ختم کرنا چاہتے ہیں؟');" style="display:inline;">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2"><i class="bi bi-trash"></i></button>
+                                <div class="action-btns">
+                                    <a href="{{ url_for('khata.khata_detail', person_type='customer', person_id=c.id) }}"
+                                       class="btn-action btn-view" title="کھاتا دیکھیں">
+                                        <i class="bi bi-journal-text"></i>
+                                    </a>
+                                    <a href="{{ url_for('customer_bp.edit_customer', customer_id=c.id) }}"
+                                       class="btn-action btn-edit" title="تبدیل کریں">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </a>
+                                    <form action="{{ url_for('customer_bp.delete_customer', customer_id=c.id) }}"
+                                          method="POST" style="display:inline;"
+                                          onsubmit="return confirm('کیا آپ واقعی اس گاہک کو حذف کرنا چاہتے ہیں؟')">
+                                        <button type="submit" class="btn-action btn-del" title="حذف کریں">
+                                            <i class="bi bi-trash3-fill"></i>
+                                        </button>
                                     </form>
                                 </div>
                             </td>
@@ -50,9 +71,11 @@
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
-                                <i class="bi bi-people text-muted" style="font-size: 2.5rem;"></i>
-                                <p class="mt-2 mb-0 fw-medium">سستم میں ابھی تک کوئی گاہک شامل نہیں کیا گیا۔</p>
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <i class="bi bi-people"></i>
+                                    <p class="fw-semibold">ابھی تک کوئی گاہک شامل نہیں کیا گیا</p>
+                                </div>
                             </td>
                         </tr>
                     {% endif %}

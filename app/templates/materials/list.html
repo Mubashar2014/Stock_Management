@@ -1,48 +1,58 @@
 {% extends 'base.html' %}
-{% block title %}مٹیریلز کی فہرست — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block title %}مٹیریل — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block nav_icon %}box-seam-fill{% endblock %}
 {% block page_title %}مٹیریل مینجمنٹ{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-0 text-end" dir="rtl">
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-        <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-box-seam text-primary me-2"></i> سسٹم میں موجود کل مٹیریلز</h5>
-        <a href="{{ url_for('material_bp.add_material') }}" class="btn btn-primary d-inline-flex align-items-center gap-2 px-4 py-2">
-            <i class="bi bi-plus-circle"></i> <span>نیا مٹیریل شامل کریں</span>
+<div dir="rtl">
+    <div class="section-heading">
+        <h5><i class="bi bi-box-seam-fill me-2" style="color:var(--brand);"></i>سسٹم میں موجود مٹیریلز</h5>
+        <a href="{{ url_for('material_bp.add_material') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
+            <i class="bi bi-plus-circle-fill"></i><span>نیا مٹیریل</span>
         </a>
     </div>
 
     <div class="card">
-        <div class="card-header fw-bold text-slate-800">مٹیریلز کا ریکارڈ</div>
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table align-middle mb-0">
                 <thead>
                     <tr>
-                        <th style="width: 80px;">آئی ڈی</th>
-                        <th style="width: 100px;">تصویر</th>
+                        <th>#</th>
+                        <th style="width:75px;">تصویر</th>
                         <th>مٹیریل کا نام</th>
-                        <th>اکائی (Unit)</th>
-                        <th>تفصیل / وضاحت</th>
-                        <th style="width: 120px; text-align: center;">ایکشنز</th>
+                        <th>اکائی</th>
+                        <th>تفصیل</th>
+                        <th class="text-center">ایکشن</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% if materials %}
                         {% for m in materials %}
                         <tr>
-                            <td class="fw-bold text-muted">#{{ m.id }}</td>
+                            <td class="text-muted fw-semibold" style="font-size:.82rem;">#{{ m.id }}</td>
                             <td>
-                                <img src="{{ url_for('static', filename='uploads/' + m.image_file) if m.image_file != 'default_material.png' else url_for('static', filename='img/default_material.png') }}"
-                                     alt="Material" class="rounded border" style="width: 50px; height: 50px; object-fit: contain; background: #f8fafc;"
-                                     onerror="this.src='https://placehold.co/50x50?text=No+Image';">
+                                <img src="{{ url_for('static', filename='uploads/' + m.image_file) if m.image_file != 'default_material.png' else 'https://placehold.co/52x52/f0fdfa/0f766e?text=M' }}"
+                                     alt="{{ m.name }}"
+                                     style="width:52px;height:52px;object-fit:contain;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);"
+                                     onerror="this.src='https://placehold.co/52x52/f0fdfa/0f766e?text=M'">
                             </td>
-                            <td class="fw-bold text-dark">{{ m.name }}</td>
-                            <td><span class="badge bg-secondary-subtle text-secondary border px-2.5 py-1.5 fs-7">{{ m.unit }}</span></td>
-                            <td class="text-secondary small">{{ m.description if m.description else '—' }}</td>
+                            <td class="fw-bold">{{ m.name }}</td>
                             <td>
-                                <div class="d-flex justify-content-center gap-2">
-                                    <a href="{{ url_for('material_bp.edit_material', material_id=m.id) }}" class="btn btn-sm btn-outline-primary py-1 px-2"><i class="bi bi-pencil-square"></i></a>
-                                    <form action="{{ url_for('material_bp.delete_material', material_id=m.id) }}" method="POST" onsubmit="return confirm('کیا آپ واقعی اس مٹیریل کو ختم کرنا چاہتے ہیں؟');" style="display:inline;">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2"><i class="bi bi-trash"></i></button>
+                                <span class="badge badge-teal px-2 py-1">{{ m.unit }}</span>
+                            </td>
+                            <td class="text-muted" style="font-size:.88rem;">{{ m.description or '—' }}</td>
+                            <td>
+                                <div class="action-btns">
+                                    <a href="{{ url_for('material_bp.edit_material', material_id=m.id) }}"
+                                       class="btn-action btn-edit" title="تبدیل کریں">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </a>
+                                    <form action="{{ url_for('material_bp.delete_material', material_id=m.id) }}"
+                                          method="POST" style="display:inline;"
+                                          onsubmit="return confirm('کیا آپ واقعی اس مٹیریل کو حذف کرنا چاہتے ہیں؟')">
+                                        <button type="submit" class="btn-action btn-del" title="حذف کریں">
+                                            <i class="bi bi-trash3-fill"></i>
+                                        </button>
                                     </form>
                                 </div>
                             </td>
@@ -50,9 +60,11 @@
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
-                                <i class="bi bi-box-seam text-muted" style="font-size: 2.5rem;"></i>
-                                <p class="mt-2 mb-0 fw-medium">سسٹم میں ابھی تک کوئی مٹیریل شامل نہیں کیا گیا۔</p>
+                            <td colspan="6">
+                                <div class="empty-state">
+                                    <i class="bi bi-box-seam"></i>
+                                    <p class="fw-semibold">ابھی تک کوئی مٹیریل شامل نہیں کیا گیا</p>
+                                </div>
                             </td>
                         </tr>
                     {% endif %}

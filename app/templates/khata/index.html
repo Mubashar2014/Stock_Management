@@ -1,0 +1,532 @@
+{% extends 'base.html' %}
+{% block title %}کھاتا بک — اسٹاک مینجمنٹ سسٹم{% endblock %}
+{% block nav_icon %}journal-bookmark-fill{% endblock %}
+{% block page_title %}کھاتا بک{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Two-panel layout ── */
+    .khata-wrapper {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 1.25rem;
+        align-items: start;
+    }
+    @media (max-width: 900px) {
+        .khata-wrapper { grid-template-columns: 1fr; }
+        .khata-panel { display: none; }
+        .khata-panel.panel-open { display: block; }
+        .mobile-panel-toggle { display: flex !important; }
+    }
+    .mobile-panel-toggle { display: none; }
+
+    /* ── Selector Panel (right) ── */
+    .khata-panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--sh-sm);
+        overflow: hidden;
+        position: sticky;
+        top: calc(var(--nav-h) + 1.5rem);
+    }
+    .panel-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-bottom: 1px solid var(--border);
+    }
+    .ptab {
+        padding: .75rem .5rem;
+        text-align: center;
+        font-size: .88rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all .18s;
+        border: none;
+        background: none;
+        font-family: var(--font);
+        border-bottom: 2px solid transparent;
+    }
+    .ptab i { display: block; font-size: 1.2rem; margin-bottom: .15rem; }
+    .ptab:hover { color: var(--brand); background: var(--brand-light); }
+    .ptab.active { color: var(--brand); border-bottom-color: var(--brand); background: var(--brand-light); }
+
+    .panel-search-wrap { padding: .75rem; border-bottom: 1px solid var(--border); }
+    .panel-search {
+        width: 100%;
+        padding: .5rem .85rem .5rem 2.2rem;
+        border: 1.5px solid var(--border);
+        border-radius: var(--r-sm);
+        font-family: var(--font);
+        font-size: .88rem;
+        background: var(--surface-2);
+        direction: rtl;
+        text-align: right;
+        transition: border-color .18s;
+    }
+    .panel-search:focus { border-color: var(--brand); outline: none; background: #fff; }
+    .search-icon-wrap { position: relative; }
+    .search-icon-wrap i {
+        position: absolute;
+        left: .65rem; top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        font-size: .85rem;
+        pointer-events: none;
+    }
+
+    .person-list { max-height: 430px; overflow-y: auto; padding: .4rem 0; }
+    .person-list::-webkit-scrollbar { width: 4px; }
+    .person-list::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 4px; }
+
+    .person-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: .6rem .85rem;
+        cursor: pointer;
+        transition: background .14s;
+        border-radius: 0;
+        text-decoration: none;
+        color: var(--text);
+        gap: .5rem;
+    }
+    .person-item:hover { background: var(--brand-light); color: var(--brand); }
+    .person-item.active { background: var(--brand-light); color: var(--brand); font-weight: 700; border-right: 3px solid var(--brand); }
+    .person-name { font-size: .9rem; font-weight: 600; line-height: 1.4; }
+    .person-phone { font-size: .75rem; color: var(--text-muted); line-height: 1.3; direction: ltr; text-align: left; }
+    .person-bal {
+        font-size: .78rem;
+        font-weight: 700;
+        padding: .15rem .5rem;
+        border-radius: 50px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .person-bal.pos { background: #fef2f2; color: #dc2626; }
+    .person-bal.zero { background: var(--surface-2); color: var(--text-muted); }
+    .no-results { text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: .88rem; }
+
+    /* ── Ledger Panel (left) ── */
+    .ledger-pane {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        box-shadow: var(--sh-sm);
+        overflow: hidden;
+    }
+
+    .ledger-header {
+        background: linear-gradient(135deg, var(--brand-deeper) 0%, var(--brand) 100%);
+        padding: 1.25rem 1.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .ledger-header::before {
+        content: '';
+        position: absolute;
+        width: 200px; height: 200px;
+        background: radial-gradient(circle, rgba(94,234,212,.12), transparent 70%);
+        top: -60px; left: -40px;
+        pointer-events: none;
+    }
+    .lh-inner { position: relative; z-index: 1; }
+    .lh-name { color: #fff; font-size: 1.25rem; font-weight: 700; line-height: 1.5; margin-bottom: .15rem; }
+    .lh-phone { color: rgba(255,255,255,.65); font-size: .85rem; direction: ltr; text-align: right; }
+    .lh-balance {
+        margin-top: .6rem;
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        background: rgba(255,255,255,.12);
+        border: 1px solid rgba(255,255,255,.18);
+        border-radius: 50px;
+        padding: .3rem 1rem;
+        color: #fff;
+        font-size: .88rem;
+        font-weight: 700;
+    }
+
+    /* Controls bar */
+    .ledger-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: .75rem;
+        padding: .85rem 1.1rem;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface-2);
+    }
+    .lc-filters { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .lc-actions { display: flex; align-items: center; gap: .5rem; }
+    .btn-ctrl {
+        display: inline-flex; align-items: center; gap: .35rem;
+        padding: .38rem .8rem;
+        border-radius: var(--r-sm);
+        font-size: .82rem;
+        font-weight: 600;
+        font-family: var(--font);
+        border: 1px solid;
+        cursor: pointer;
+        transition: all .15s;
+        text-decoration: none;
+    }
+    .btn-print { color: var(--text-2); border-color: var(--border); background: var(--surface); }
+    .btn-print:hover { background: var(--surface-2); color: var(--text); }
+    .btn-whatsapp { color: #fff; border-color: #16a34a; background: #16a34a; }
+    .btn-whatsapp:hover { background: #15803d; border-color: #15803d; }
+    .date-inp {
+        padding: .38rem .7rem;
+        border: 1.5px solid var(--border);
+        border-radius: var(--r-sm);
+        font-size: .82rem;
+        font-family: var(--font);
+        background: var(--surface);
+        direction: ltr;
+        color: var(--text);
+        transition: border-color .18s;
+    }
+    .date-inp:focus { border-color: var(--brand); outline: none; }
+    .lc-label { font-size: .8rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+
+    /* Ledger table */
+    .ledger-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    .ledger-table thead th {
+        background: var(--brand-light);
+        color: var(--brand-dark);
+        font-weight: 700;
+        font-size: .78rem;
+        padding: .7rem 1rem;
+        border-bottom: 2px solid var(--brand-border);
+        white-space: nowrap;
+        text-align: right;
+    }
+    .ledger-table tbody td {
+        padding: .65rem 1rem;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+        text-align: right;
+    }
+    .ledger-table tbody tr:hover { background: #f0fdfa; }
+    .ledger-table tbody tr.opening-row { background: #fffbeb; }
+    .ledger-table tbody tr.opening-row td { font-weight: 700; color: var(--accent); }
+
+    .lt-date { color: var(--text-muted); font-size: .8rem; white-space: nowrap; }
+    .lt-desc { color: var(--text-2); max-width: 220px; }
+    .lt-debit  { color: #dc2626; font-weight: 700; text-align: left !important; direction: ltr; }
+    .lt-credit { color: #16a34a; font-weight: 700; text-align: left !important; direction: ltr; }
+    .lt-bal    { font-weight: 700; text-align: left !important; direction: ltr; white-space: nowrap; }
+    .lt-bal.pos { color: #dc2626; }
+    .lt-bal.neg { color: #16a34a; }
+    .lt-bal.zero { color: var(--text-muted); }
+
+    /* Closing balance footer */
+    .ledger-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: .85rem 1.1rem;
+        background: var(--surface-2);
+        border-top: 2px solid var(--border);
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+    .lf-label { font-size: .85rem; font-weight: 700; color: var(--text-2); }
+    .lf-amount { font-size: 1.1rem; font-weight: 700; }
+    .lf-amount.owe { color: #dc2626; }
+    .lf-amount.clear { color: #16a34a; }
+
+    /* Placeholder state */
+    .khata-placeholder {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+    .khata-placeholder .ph-icon {
+        width: 80px; height: 80px;
+        background: var(--brand-light);
+        border: 2px dashed var(--brand-border);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 2rem;
+        color: var(--brand);
+        margin: 0 auto 1.25rem;
+    }
+    .khata-placeholder h5 { color: var(--text); font-weight: 700; margin-bottom: .5rem; }
+    .khata-placeholder p { color: var(--text-muted); font-size: .9rem; max-width: 320px; margin: 0 auto; }
+
+    @media print {
+        .khata-panel, .ledger-controls, .no-print { display: none !important; }
+        .khata-wrapper { grid-template-columns: 1fr !important; }
+        .ledger-pane { box-shadow: none !important; border: 1px solid #ddd !important; }
+        .ledger-header { background: #042f2e !important; -webkit-print-color-adjust: exact; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div dir="rtl">
+
+    <!-- Mobile panel toggle -->
+    <button class="btn btn-primary mb-3 mobile-panel-toggle align-items-center gap-2 no-print"
+            id="mobilePanelBtn" onclick="toggleMobilePanel()">
+        <i class="bi bi-people-fill"></i>
+        <span>{% if person %}{{ person.name }}{% else %}شخص منتخب کریں{% endif %}</span>
+        <i class="bi bi-chevron-down ms-auto"></i>
+    </button>
+
+    <div class="khata-wrapper">
+
+        <!-- ═══ SELECTOR PANEL ═══ -->
+        <div class="khata-panel" id="khataPanel">
+            <!-- Tabs -->
+            <div class="panel-tabs">
+                <button class="ptab {% if person_type == 'supplier' or not person_type %}active{% endif %}"
+                        id="tabSupplier" onclick="switchTab('supplier')">
+                    <i class="bi bi-truck"></i>سپلائرز
+                </button>
+                <button class="ptab {% if person_type == 'customer' %}active{% endif %}"
+                        id="tabCustomer" onclick="switchTab('customer')">
+                    <i class="bi bi-person-check-fill"></i>گاہک
+                </button>
+            </div>
+
+            <!-- Search -->
+            <div class="panel-search-wrap">
+                <div class="search-icon-wrap">
+                    <i class="bi bi-search"></i>
+                    <input type="text" class="panel-search" id="personSearch"
+                           placeholder="نام سے تلاش کریں..."
+                           oninput="filterPersons(this.value)">
+                </div>
+            </div>
+
+            <!-- Supplier list -->
+            <div class="person-list" id="listSupplier"
+                 style="{% if person_type == 'customer' %}display:none{% endif %}">
+                {% for s in suppliers %}
+                <a href="{{ url_for('khata.khata_detail', person_type='supplier', person_id=s.id) }}"
+                   class="person-item {% if person_type == 'supplier' and person_id == s.id %}active{% endif %}"
+                   data-name="{{ s.name }}">
+                    <div>
+                        <div class="person-name">{{ s.name }}</div>
+                        {% if s.phone %}<div class="person-phone">{{ s.phone }}</div>{% endif %}
+                    </div>
+                    <span class="person-bal {% if s.current_balance > 0 %}pos{% else %}zero{% endif %}">
+                        {{ "{:,.0f}".format(s.current_balance) }}
+                    </span>
+                </a>
+                {% else %}
+                <div class="no-results">کوئی سپلائر موجود نہیں</div>
+                {% endfor %}
+            </div>
+
+            <!-- Customer list -->
+            <div class="person-list" id="listCustomer"
+                 style="{% if person_type != 'customer' %}display:none{% endif %}">
+                {% for c in customers %}
+                <a href="{{ url_for('khata.khata_detail', person_type='customer', person_id=c.id) }}"
+                   class="person-item {% if person_type == 'customer' and person_id == c.id %}active{% endif %}"
+                   data-name="{{ c.name }}">
+                    <div>
+                        <div class="person-name">{{ c.name }}</div>
+                        {% if c.phone %}<div class="person-phone">{{ c.phone }}</div>{% endif %}
+                    </div>
+                    <span class="person-bal {% if c.current_balance > 0 %}pos{% else %}zero{% endif %}">
+                        {{ "{:,.0f}".format(c.current_balance) }}
+                    </span>
+                </a>
+                {% else %}
+                <div class="no-results">کوئی گاہک موجود نہیں</div>
+                {% endfor %}
+            </div>
+        </div>
+        <!-- /SELECTOR PANEL -->
+
+        <!-- ═══ LEDGER PANE ═══ -->
+        <div class="ledger-pane">
+
+            {% if person %}
+
+            <!-- Header -->
+            <div class="ledger-header no-print">
+                <div class="lh-inner">
+                    <div class="lh-name">
+                        <i class="bi bi-{% if person_type == 'supplier' %}truck{% else %}person-check-fill{% endif %} me-2"></i>
+                        {{ person.name }}
+                    </div>
+                    {% if person.phone %}
+                    <div class="lh-phone"><i class="bi bi-telephone me-1"></i>{{ person.phone }}</div>
+                    {% endif %}
+                    <div class="lh-balance">
+                        <i class="bi bi-wallet2"></i>
+                        موجودہ بیلنس:
+                        <span dir="ltr">{{ "{:,.2f}".format(person.current_balance) }} روپے</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Print-only header -->
+            <div style="display:none;" class="print-only p-3 border-bottom">
+                <h4 style="margin:0;font-size:1.1rem;">{{ person.name }} — کھاتا بک</h4>
+                {% if person.phone %}<p style="margin:0;font-size:.85rem;color:#666;">فون: {{ person.phone }}</p>{% endif %}
+                <p style="margin:0;font-size:.8rem;color:#666;">
+                    تاریخ پرنٹ:
+                    <span dir="ltr">{% if start_date %}{{ start_date }} تا {% endif %}{{ end_date or today }}</span>
+                </p>
+            </div>
+
+            <!-- Controls -->
+            <div class="ledger-controls no-print">
+                <form method="GET" action="{{ url_for('khata.khata_detail', person_type=person_type, person_id=person_id) }}"
+                      class="lc-filters" id="filterForm">
+                    <span class="lc-label">تاریخ:</span>
+                    <input type="date" class="date-inp" name="start_date"
+                           value="{{ start_date }}" placeholder="شروع">
+                    <span class="lc-label">تا</span>
+                    <input type="date" class="date-inp" name="end_date"
+                           value="{{ end_date }}" placeholder="آخر">
+                    <button type="submit" class="btn-ctrl btn-print">
+                        <i class="bi bi-funnel-fill"></i>فلٹر
+                    </button>
+                    <a href="{{ url_for('khata.khata_detail', person_type=person_type, person_id=person_id) }}"
+                       class="btn-ctrl btn-print">
+                        <i class="bi bi-x-circle"></i>صاف
+                    </a>
+                </form>
+                <div class="lc-actions">
+                    <button class="btn-ctrl btn-print" onclick="window.print()">
+                        <i class="bi bi-printer-fill"></i>پرنٹ
+                    </button>
+                    {% if person.phone %}
+                    <a href="{{ 'https://wa.me/92' + person.phone.lstrip('0') + '?text=' + (person.name + ' کا کھاتا بک%0A' + 'موجودہ بیلنس: ' + '{:,.0f}'.format(person.current_balance) + ' روپے%0Aسسٹم: اسٹاک مینجمنٹ') | urlencode }}"
+                       target="_blank" class="btn-ctrl btn-whatsapp">
+                        <i class="bi bi-whatsapp"></i>واٹس ایپ
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Ledger Table -->
+            <div class="table-responsive">
+                <table class="ledger-table">
+                    <thead>
+                        <tr>
+                            <th style="width:100px;">تاریخ</th>
+                            <th>تفصیل</th>
+                            <th style="width:130px;">ادھار (Dr)</th>
+                            <th style="width:130px;">ادائیگی (Cr)</th>
+                            <th style="width:140px;">بقایا</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in ledger_rows %}
+                        <tr class="{% if row.is_opening %}opening-row{% endif %}">
+                            <td class="lt-date">
+                                {% if row.is_opening %}
+                                    <span class="badge badge-teal">ابتدائی</span>
+                                {% else %}
+                                    {{ row.date.strftime('%d-%m-%Y') if row.date else '—' }}
+                                {% endif %}
+                            </td>
+                            <td class="lt-desc">{{ row.description }}</td>
+                            <td class="lt-debit">
+                                {% if row.debit > 0 %}{{ "{:,.2f}".format(row.debit) }}{% else %}—{% endif %}
+                            </td>
+                            <td class="lt-credit">
+                                {% if row.credit > 0 %}{{ "{:,.2f}".format(row.credit) }}{% else %}—{% endif %}
+                            </td>
+                            <td class="lt-bal {% if row.balance > 0 %}pos{% elif row.balance < 0 %}neg{% else %}zero{% endif %}">
+                                {{ "{:,.2f}".format(row.balance) }}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                منتخب تاریخوں میں کوئی ریکارڈ نہیں
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer -->
+            <div class="ledger-footer">
+                <span class="lf-label">اختتامی بقایا (Closing Balance)</span>
+                <span class="lf-amount {% if closing_balance > 0 %}owe{% elif closing_balance < 0 %}clear{% else %}clear{% endif %}">
+                    {{ "{:,.2f}".format(closing_balance) }} روپے
+                    {% if closing_balance > 0 %}
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-2 fs-7">واجب الادا</span>
+                    {% else %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle ms-2 fs-7">صاف</span>
+                    {% endif %}
+                </span>
+            </div>
+
+            {% else %}
+            <!-- Placeholder -->
+            <div class="khata-placeholder">
+                <div class="ph-icon"><i class="bi bi-journal-bookmark-fill"></i></div>
+                <h5>کھاتا بک</h5>
+                <p>بائیں طرف سے سپلائر یا گاہک منتخب کریں تاکہ اس کا مکمل کھاتا یہاں کھل جائے۔</p>
+            </div>
+            {% endif %}
+
+        </div>
+        <!-- /LEDGER PANE -->
+
+    </div><!-- /khata-wrapper -->
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<style>
+@media print {
+    .print-only { display: block !important; }
+    .no-print { display: none !important; }
+}
+</style>
+<script>
+const currentTab = "{{ person_type or 'supplier' }}";
+
+function switchTab(tab) {
+    document.getElementById('tabSupplier').classList.toggle('active', tab === 'supplier');
+    document.getElementById('tabCustomer').classList.toggle('active', tab === 'customer');
+    document.getElementById('listSupplier').style.display = tab === 'supplier' ? '' : 'none';
+    document.getElementById('listCustomer').style.display = tab === 'customer' ? '' : 'none';
+    document.getElementById('personSearch').value = '';
+    filterPersons('');
+}
+
+function filterPersons(q) {
+    const lower = q.toLowerCase();
+    const activeList = currentTab === 'customer'
+        ? document.getElementById('listCustomer')
+        : document.getElementById('listSupplier');
+
+    // find current visible list
+    const visibleList = document.getElementById('listSupplier').style.display !== 'none'
+        ? document.getElementById('listSupplier')
+        : document.getElementById('listCustomer');
+
+    visibleList.querySelectorAll('.person-item').forEach(function(item) {
+        const name = item.getAttribute('data-name') || '';
+        item.style.display = name.toLowerCase().includes(lower) || q === '' ? '' : 'none';
+    });
+}
+
+function toggleMobilePanel() {
+    const panel = document.getElementById('khataPanel');
+    panel.classList.toggle('panel-open');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-open correct tab based on URL
+    if (currentTab === 'customer') switchTab('customer');
+    else switchTab('supplier');
+});
+</script>
+{% endblock %}
