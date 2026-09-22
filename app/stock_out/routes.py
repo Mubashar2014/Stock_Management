@@ -1,9 +1,12 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file
 from flask_login import login_required
-from app.models import StockOut, Customer, Material,StockIn
+from app.models import StockOut, Customer, Material, StockIn, Cashbook
 from app.db import db
+from app.utils import create_receipt_image, save_temp_image
 from datetime import datetime
 from decimal import Decimal
+import urllib.parse
+import os
 
 stock_out_bp = Blueprint('stock_out', __name__)
 
@@ -84,6 +87,20 @@ def add_stock_out():
             if customer:
                 customer.current_balance += float(remaining)
 
+            # Auto-create Cashbook entry if payment was received
+            if paid_amount > 0:
+                material = Material.query.get(material_id)
+                material_name = material.name if material else 'مٹیریل'
+                cashbook_entry = Cashbook(
+                    type='credit',
+                    amount=paid_amount,
+                    reference_type='customer',
+                    reference_id=customer_id,
+                    description=f'فروخت کی وصولی - {material_name} ({quantity} {material.unit if material else ""})',
+                    date=transaction_date
+                )
+                db.session.add(cashbook_entry)
+
             db.session.commit()
             flash('فروخت کا اندراج کامیابی سے محفوظ کر لیا گیا ہے!', 'success')
             return redirect(url_for('stock_out.list_stock_out'))
@@ -146,6 +163,7 @@ def edit_stock_out(entry_id):
         new_remaining = new_total_amount - paid_amount
 
         try:
+            old_paid_amount = entry.paid_amount
             old_customer = Customer.query.get(old_customer_id)
             if old_customer:
                 old_customer.current_balance -= float(old_remaining)
@@ -167,6 +185,33 @@ def edit_stock_out(entry_id):
             if new_customer:
                 new_customer.current_balance += float(new_remaining)
 
+            # Update Cashbook entries for payment changes
+            # Delete old cashbook entry if it exists
+            if old_paid_amount > 0:
+                old_cashbook = Cashbook.query.filter_by(
+                    reference_type='customer',
+                    reference_id=old_customer_id,
+                    type='credit',
+                    amount=old_paid_amount,
+                    date=entry.date
+                ).first()
+                if old_cashbook:
+                    db.session.delete(old_cashbook)
+
+            # Create new cashbook entry if payment was received
+            if paid_amount > 0:
+                material = Material.query.get(material_id)
+                material_name = material.name if material else 'مٹیریل'
+                cashbook_entry = Cashbook(
+                    type='credit',
+                    amount=paid_amount,
+                    reference_type='customer',
+                    reference_id=customer_id,
+                    description=f'فروخت کی وصولی - {material_name} ({quantity} {material.unit if material else ""})',
+                    date=datetime.strptime(date_str, '%Y-%m-%d').date()
+                )
+                db.session.add(cashbook_entry)
+
             db.session.commit()
             flash('فروخت کا ریکارڈ کامیابی سے اپڈیٹ کر دیا گیا ہے!', 'success')
             return redirect(url_for('stock_out.list_stock_out'))
@@ -179,7 +224,6 @@ def edit_stock_out(entry_id):
     customers = Customer.query.order_by(Customer.name.asc()).all()
     materials = Material.query.order_by(Material.name.asc()).all()
     return render_template('stock_out/edit.html', entry=entry, customers=customers, materials=materials)
-# 4. DELETE SALE
 @stock_out_bp.route('/delete/<int:entry_id>', methods=['POST'])
 @login_required
 def delete_stock_out(entry_id):
@@ -189,6 +233,18 @@ def delete_stock_out(entry_id):
         if customer:
             customer.current_balance -= float(entry.remaining)
 
+        # Delete associated cashbook entry if payment was received
+        if entry.paid_amount > 0:
+            cashbook_entry = Cashbook.query.filter_by(
+                reference_type='customer',
+                reference_id=entry.customer_id,
+                type='credit',
+                amount=entry.paid_amount,
+                date=entry.date
+            ).first()
+            if cashbook_entry:
+                db.session.delete(cashbook_entry)
+
         db.session.delete(entry)
         db.session.commit()
         flash('فروخت کا ریکارڈ ختم اور گاہک کا بیلنس ریورس کر دیا گیا ہے۔', 'warning')
@@ -197,3 +253,76 @@ def delete_stock_out(entry_id):
         flash(f'خرابی: {str(e)}', 'danger')
 
     return redirect(url_for('stock_out.list_stock_out'))
+
+
+
+# 5. RECEIPT VIEW
+@stock_out_bp.route('/receipt/<int:entry_id>')
+@login_required
+def view_receipt(entry_id):
+    entry = StockOut.query.get_or_404(entry_id)
+    now = datetime.now()
+    return render_template('receipts/stock_out_receipt.html', entry=entry, now=now)
+
+
+# 6. DOWNLOAD RECEIPT IMAGE
+@stock_out_bp.route('/receipt/<int:entry_id>/image')
+@login_required
+def download_receipt_image(entry_id):
+    """Generate and download receipt as PNG image."""
+    entry = StockOut.query.get_or_404(entry_id)
+    
+    # Create image using PIL
+    image_bytes = create_receipt_image(entry, entry_type='stock_out')
+    
+    # Save to temp file
+    temp_path = save_temp_image(image_bytes, prefix=f'stock_out_receipt_{entry.id}')
+    
+    # Send file and clean up
+    response = send_file(
+        temp_path,
+        mimetype='image/png',
+        as_attachment=True,
+        download_name=f'receipt_stock_out_{entry.id}.png'
+    )
+    
+    # Schedule cleanup after sending
+    @response.call_on_close
+    def cleanup():
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
+    
+    return response
+
+
+# 7. WHATSAPP SHARE (Image-based)
+@stock_out_bp.route('/whatsapp/<int:entry_id>')
+@login_required
+def share_whatsapp(entry_id):
+    """Share receipt image via WhatsApp."""
+    entry = StockOut.query.get_or_404(entry_id)
+    
+    # Get customer phone number
+    phone = entry.customer.phone
+    if phone:
+        # Clean phone number - remove leading 0 and add 92
+        phone = phone.lstrip('0')
+        if not phone.startswith('92'):
+            phone = '92' + phone
+    else:
+        phone = ''
+    
+    # Create simple message with receipt download link
+    message = f"""رسید - فروخت #{entry.id}
+{entry.customer.name}
+باقی رقم: {"{:,.0f}".format(entry.remaining)} روپے
+
+رسید ڈاؤن لوڈ کریں:
+{request.host_url}stock-out/receipt/{entry.id}/image"""
+    
+    # WhatsApp URL (user will need to manually attach the downloaded image)
+    whatsapp_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message)}"
+    
+    return redirect(whatsapp_url)

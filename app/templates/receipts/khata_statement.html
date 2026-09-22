@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>کھاتا سٹیٹمنٹ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: {% if person_type == 'supplier' %}linear-gradient(135deg, #667eea 0%, #764ba2 100%){% else %}linear-gradient(135deg, #11998e 0%, #38ef7d 100%){% endif %};
+            padding: 0;
+            margin: 0;
+        }
+        
+        .statement-container {
+            background: white;
+            width: 800px;
+            margin: 0;
+            overflow: hidden;
+        }
+        
+        .statement-header {
+            background: {% if person_type == 'supplier' %}linear-gradient(135deg, #667eea 0%, #764ba2 100%){% else %}linear-gradient(135deg, #11998e 0%, #38ef7d 100%){% endif %};
+            color: white;
+            padding: 35px 40px;
+            text-align: center;
+        }
+        
+        .shop-name {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .shop-name-english {
+            font-size: 30px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            opacity: 0.9;
+        }
+        
+        .statement-type {
+            font-size: 22px;
+            background: rgba(255,255,255,0.2);
+            padding: 10px 25px;
+            border-radius: 25px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        
+        .statement-body {
+            padding: 40px;
+        }
+        
+        .person-info {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            border-right: 6px solid {% if person_type == 'supplier' %}#667eea{% else %}#11998e{% endif %};
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 2px dashed #dee2e6;
+            font-size: 20px;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            color: #666;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .info-value {
+            font-weight: bold;
+            color: #333;
+            font-size: 22px;
+        }
+        
+        .icon {
+            font-size: 24px;
+        }
+        
+        .balance-box {
+            background: {% if person_type == 'supplier' %}linear-gradient(135deg, #667eea 0%, #764ba2 100%){% else %}linear-gradient(135deg, #11998e 0%, #38ef7d 100%){% endif %};
+            color: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .balance-label {
+            font-size: 24px;
+            margin-bottom: 15px;
+            opacity: 0.9;
+            font-weight: 600;
+        }
+        
+        .balance-amount {
+            font-size: 64px;
+            font-weight: bold;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+            line-height: 1.2;
+        }
+        
+        .balance-currency {
+            font-size: 32px;
+            margin-right: 10px;
+        }
+        
+        .balance-subtitle {
+            font-size: 18px;
+            margin-top: 15px;
+            opacity: 0.85;
+        }
+        
+        .statement-footer {
+            background: #f8f9fa;
+            padding: 25px 40px;
+            text-align: center;
+            color: #666;
+            border-top: 3px solid #e9ecef;
+        }
+        
+        .footer-message {
+            font-size: 22px;
+            margin-bottom: 12px;
+            color: {% if person_type == 'supplier' %}#667eea{% else %}#11998e{% endif %};
+            font-weight: bold;
+        }
+        
+        .footer-date {
+            font-size: 16px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="statement-container">
+        <!-- Header -->
+        <div class="statement-header">
+            <div class="shop-name">شیر علی بلڈنگ میٹریل</div>
+            <div class="shop-name-english">Sher Ali Building Material</div>
+            <div class="statement-type">کھاتا سٹیٹمنٹ</div>
+        </div>
+        
+        <!-- Body -->
+        <div class="statement-body">
+            <!-- Person Info -->
+            <div class="person-info">
+                <div class="info-row">
+                    <span class="info-label">
+                        <span class="icon">{% if person_type == 'supplier' %}🚚{% else %}👤{% endif %}</span>
+                        {% if person_type == 'supplier' %}سپلائر کا نام:{% else %}گاہک کا نام:{% endif %}
+                    </span>
+                    <span class="info-value">{{ person.name }}</span>
+                </div>
+                
+                {% if person.phone %}
+                <div class="info-row">
+                    <span class="info-label">
+                        <span class="icon">📞</span>
+                        فون نمبر:
+                    </span>
+                    <span class="info-value" style="direction: ltr;">{{ person.phone }}</span>
+                </div>
+                {% endif %}
+                
+                {% if person.address %}
+                <div class="info-row">
+                    <span class="info-label">
+                        <span class="icon">📍</span>
+                        پتہ:
+                    </span>
+                    <span class="info-value">{{ person.address }}</span>
+                </div>
+                {% endif %}
+                
+                <div class="info-row">
+                    <span class="info-label">
+                        <span class="icon">📅</span>
+                        تاریخ:
+                    </span>
+                    <span class="info-value">{{ now.strftime('%d/%m/%Y') }}</span>
+                </div>
+            </div>
+            
+            <!-- Balance Box -->
+            <div class="balance-box">
+                <div class="balance-label">موجودہ باقیہ رقم</div>
+                <div class="balance-label" style="font-size: 20px; opacity: 0.8;">Current Balance</div>
+                <div class="balance-amount">
+                    <span class="balance-currency">روپے</span>{{ "{:,.0f}".format(person.current_balance) }}
+                </div>
+                {% if person.current_balance > 0 %}
+                <div class="balance-subtitle">⚠️ واجب الادا (Amount Due)</div>
+                {% else %}
+                <div class="balance-subtitle">✅ کلیئر (Clear)</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="statement-footer">
+            <div class="footer-message">شکریہ! آپ کے تعاون کا</div>
+            <div class="footer-date">سسٹم: اسٹاک مینجمنٹ | شیر علی بلڈنگ میٹریل</div>
+        </div>
+    </div>
+</body>
+</html>

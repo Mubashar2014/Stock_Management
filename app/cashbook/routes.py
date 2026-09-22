@@ -137,9 +137,13 @@ def index():
 @login_required
 def delete_entry(entry_id):
     entry = Cashbook.query.get_or_404(entry_id)
+    
+    # Check if this is an auto-generated entry from stock transactions
     if entry.reference_type in ['supplier', 'customer'] and entry.reference_id is not None:
-        flash('یہ اندراج بلنگ فارم سے خودکار طور پر تیار ہوا ہے، اسے وہاں سے ہی ختم کیا جا سکتا ہے۔', 'danger')
-        return redirect(url_for('cashbook.index'))
+        # Check if description contains transaction keywords
+        if 'خریداری کی ادائیگی' in entry.description or 'فروخت کی وصولی' in entry.description:
+            flash('یہ اندراج خریداری/فروخت کی ادائیگی سے خودکار طور پر تیار ہوا ہے، اسے Stock In/Out سے ہی ختم کیا جا سکتا ہے۔', 'danger')
+            return redirect(url_for('cashbook.index'))
 
     try:
         db.session.delete(entry)

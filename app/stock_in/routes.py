@@ -1,9 +1,12 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file
 from flask_login import login_required
-from app.models import StockIn, Supplier, Material
+from app.models import StockIn, Supplier, Material, Cashbook
 from app.db import db
+from app.utils import create_receipt_image, save_temp_image
 from datetime import datetime
 from decimal import Decimal
+import urllib.parse
+import os
 
 stock_in_bp = Blueprint('stock_in', __name__)
 
@@ -72,6 +75,20 @@ def add_stock_in():
             if supplier:
                 supplier.current_balance += float(remaining)
 
+            # Auto-create Cashbook entry if payment was made
+            if paid_amount > 0:
+                material = Material.query.get(material_id)
+                material_name = material.name if material else 'مٹیریل'
+                cashbook_entry = Cashbook(
+                    type='debit',
+                    amount=paid_amount,
+                    reference_type='supplier',
+                    reference_id=supplier_id,
+                    description=f'خریداری کی ادائیگی - {material_name} ({quantity} {material.unit if material else ""})',
+                    date=transaction_date
+                )
+                db.session.add(cashbook_entry)
+
             db.session.commit()
             flash('خریداری کا اندراج کامیابی سے محفوظ کر لیا گیا ہے!', 'success')
             return redirect(url_for('stock_in.list_stock_in'))
@@ -115,6 +132,8 @@ def edit_stock_in(entry_id):
         new_remaining = new_total_amount - paid_amount
 
         try:
+            old_paid_amount = entry.paid_amount
+            
             # Step A: Purane balance ka asar khatam (Reverse) karna
             old_supplier = Supplier.query.get(old_supplier_id)
             if old_supplier:
@@ -137,6 +156,33 @@ def edit_stock_in(entry_id):
             new_supplier = Supplier.query.get(supplier_id)
             if new_supplier:
                 new_supplier.current_balance += float(new_remaining)
+
+            # Step D: Update Cashbook entries for payment changes
+            # Delete old cashbook entry if it exists
+            if old_paid_amount > 0:
+                old_cashbook = Cashbook.query.filter_by(
+                    reference_type='supplier',
+                    reference_id=old_supplier_id,
+                    type='debit',
+                    amount=old_paid_amount,
+                    date=entry.date
+                ).first()
+                if old_cashbook:
+                    db.session.delete(old_cashbook)
+
+            # Create new cashbook entry if payment was made
+            if paid_amount > 0:
+                material = Material.query.get(material_id)
+                material_name = material.name if material else 'مٹیریل'
+                cashbook_entry = Cashbook(
+                    type='debit',
+                    amount=paid_amount,
+                    reference_type='supplier',
+                    reference_id=supplier_id,
+                    description=f'خریداری کی ادائیگی - {material_name} ({quantity} {material.unit if material else ""})',
+                    date=datetime.strptime(date_str, '%Y-%m-%d').date()
+                )
+                db.session.add(cashbook_entry)
 
             db.session.commit()
             flash('خریداری کا ریکارڈ کامیابی سے اپڈیٹ کر دیا گیا ہے!', 'success')
@@ -162,6 +208,18 @@ def delete_stock_in(entry_id):
         if supplier:
             supplier.current_balance -= float(entry.remaining)
 
+        # Delete associated cashbook entry if payment was made
+        if entry.paid_amount > 0:
+            cashbook_entry = Cashbook.query.filter_by(
+                reference_type='supplier',
+                reference_id=entry.supplier_id,
+                type='debit',
+                amount=entry.paid_amount,
+                date=entry.date
+            ).first()
+            if cashbook_entry:
+                db.session.delete(cashbook_entry)
+
         db.session.delete(entry)
         db.session.commit()
         flash('خریداری کا ریکارڈ ختم اور سپلائر کا بیلنس ریورس کر دیا گیا ہے۔', 'warning')
@@ -170,3 +228,76 @@ def delete_stock_in(entry_id):
         flash(f'خرابی: {str(e)}', 'danger')
 
     return redirect(url_for('stock_in.list_stock_in'))
+
+
+
+# 5. RECEIPT VIEW
+@stock_in_bp.route('/receipt/<int:entry_id>')
+@login_required
+def view_receipt(entry_id):
+    entry = StockIn.query.get_or_404(entry_id)
+    now = datetime.now()
+    return render_template('receipts/stock_in_receipt.html', entry=entry, now=now)
+
+
+# 6. DOWNLOAD RECEIPT IMAGE
+@stock_in_bp.route('/receipt/<int:entry_id>/image')
+@login_required
+def download_receipt_image(entry_id):
+    """Generate and download receipt as PNG image."""
+    entry = StockIn.query.get_or_404(entry_id)
+    
+    # Create image using PIL
+    image_bytes = create_receipt_image(entry, entry_type='stock_in')
+    
+    # Save to temp file
+    temp_path = save_temp_image(image_bytes, prefix=f'stock_in_receipt_{entry.id}')
+    
+    # Send file and clean up
+    response = send_file(
+        temp_path,
+        mimetype='image/png',
+        as_attachment=True,
+        download_name=f'receipt_stock_in_{entry.id}.png'
+    )
+    
+    # Schedule cleanup after sending
+    @response.call_on_close
+    def cleanup():
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
+    
+    return response
+
+
+# 7. WHATSAPP SHARE (Image-based)
+@stock_in_bp.route('/whatsapp/<int:entry_id>')
+@login_required
+def share_whatsapp(entry_id):
+    """Share receipt image via WhatsApp."""
+    entry = StockIn.query.get_or_404(entry_id)
+    
+    # Get supplier phone number
+    phone = entry.supplier.phone
+    if phone:
+        # Clean phone number - remove leading 0 and add 92
+        phone = phone.lstrip('0')
+        if not phone.startswith('92'):
+            phone = '92' + phone
+    else:
+        phone = ''
+    
+    # Create simple message with receipt download link
+    message = f"""رسید - خریداری #{entry.id}
+{entry.supplier.name}
+باقی رقم: {"{:,.0f}".format(entry.remaining)} روپے
+
+رسید ڈاؤن لوڈ کریں:
+{request.host_url}stock-in/receipt/{entry.id}/image"""
+    
+    # WhatsApp URL (user will need to manually attach the downloaded image)
+    whatsapp_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message)}"
+    
+    return redirect(whatsapp_url)
