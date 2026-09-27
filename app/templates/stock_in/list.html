@@ -82,6 +82,16 @@
                             </td>
                             <td>
                                 <div class="action-btns">
+                                    <a href="{{ url_for('stock_in.view_receipt', entry_id=e.id) }}"
+                                       class="btn-action" style="background:#667eea;color:white;" 
+                                       title="رسید دیکھیں" target="_blank">
+                                        <i class="bi bi-receipt"></i>
+                                    </a>
+                                    <a href="{{ url_for('stock_in.share_whatsapp', entry_id=e.id) }}"
+                                       class="btn-action" style="background:#25D366;color:white;" 
+                                       title="WhatsApp پر شیئر کریں" target="_blank">
+                                        <i class="bi bi-whatsapp"></i>
+                                    </a>
                                     <a href="{{ url_for('stock_in.edit_stock_in', entry_id=e.id) }}"
                                        class="btn-action btn-edit" title="تبدیل کریں">
                                         <i class="bi bi-pencil-fill"></i>

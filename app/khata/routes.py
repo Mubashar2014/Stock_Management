@@ -1,10 +1,13 @@
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, redirect, send_file, url_for
 from flask_login import login_required
 from app.models import Supplier, Customer, StockIn, StockOut, Cashbook
 from app.db import db
+from app.utils import create_khata_statement_image, save_temp_image
 from sqlalchemy import func
 from decimal import Decimal
 from datetime import datetime, date
+import urllib.parse
+import os
 
 khata_bp = Blueprint('khata', __name__)
 
@@ -147,15 +150,8 @@ def khata_detail(person_type, person_id):
                 'credit': Decimal('0'),
                 'is_opening': False,
             })
-            # If partial payment was made at the time of transaction
-            if obj.paid_amount and Decimal(str(obj.paid_amount)) > 0:
-                rows.append({
-                    'date': ev_date,
-                    'description': 'ادائیگی (لین دین کے ساتھ)',
-                    'debit':  Decimal('0'),
-                    'credit': Decimal(str(obj.paid_amount)),
-                    'is_opening': False,
-                })
+            # Note: paid_amount at transaction time is now handled by Cashbook entries
+            # No need to add separate inline payment rows here anymore
         else:
             # Cashbook payment
             obj_p = ev['obj']
@@ -229,3 +225,85 @@ def khata_detail(person_type, person_id):
         closing_balance=closing_balance,
         today=today_str,
     )
+
+
+# ── NEW: Khata Statement Image Routes ─────────────────────────────────
+
+@khata_bp.route('/<string:person_type>/<int:person_id>/statement-image')
+@login_required
+def download_statement_image(person_type, person_id):
+    """Generate and download Khata statement as PNG image."""
+    
+    # Validate person_type
+    if person_type not in ('supplier', 'customer'):
+        return redirect(url_for('khata.index'))
+    
+    # Load the person
+    if person_type == 'supplier':
+        person = Supplier.query.get_or_404(person_id)
+    else:
+        person = Customer.query.get_or_404(person_id)
+    
+    # Create image using PIL
+    image_bytes = create_khata_statement_image(person, person_type)
+    
+    # Save to temp file
+    temp_path = save_temp_image(image_bytes, prefix=f'khata_{person_type}_{person_id}')
+    
+    # Send file and clean up
+    response = send_file(
+        temp_path,
+        mimetype='image/png',
+        as_attachment=True,
+        download_name=f'khata_statement_{person.name}_{person_id}.png'
+    )
+    
+    # Schedule cleanup after sending
+    @response.call_on_close
+    def cleanup():
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
+    
+    return response
+
+
+@khata_bp.route('/<string:person_type>/<int:person_id>/whatsapp')
+@login_required
+def share_statement_whatsapp(person_type, person_id):
+    """Share Khata statement via WhatsApp."""
+    
+    # Validate person_type
+    if person_type not in ('supplier', 'customer'):
+        return redirect(url_for('khata.index'))
+    
+    # Load the person
+    if person_type == 'supplier':
+        person = Supplier.query.get_or_404(person_id)
+    else:
+        person = Customer.query.get_or_404(person_id)
+    
+    # Get phone number
+    phone = person.phone
+    if phone:
+        # Clean phone number - remove leading 0 and add 92
+        phone = phone.lstrip('0')
+        if not phone.startswith('92'):
+            phone = '92' + phone
+    else:
+        phone = ''
+    
+    # Create simple message with statement download link
+    person_label = 'سپلائر' if person_type == 'supplier' else 'گاہک'
+    message = f"""کھاتا سٹیٹمنٹ
+{person_label}: {person.name}
+موجودہ باقیہ رقم: {"{:,.0f}".format(person.current_balance)} روپے
+
+سٹیٹمنٹ ڈاؤن لوڈ کریں:
+{request.host_url}khata/{person_type}/{person_id}/statement-image"""
+    
+    # WhatsApp URL
+    whatsapp_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message)}"
+    
+    return redirect(whatsapp_url)

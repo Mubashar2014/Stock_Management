@@ -400,7 +400,7 @@
                         <i class="bi bi-printer-fill"></i>پرنٹ
                     </button>
                     {% if person.phone %}
-                    <a href="{{ 'https://wa.me/92' + person.phone.lstrip('0') + '?text=' + (person.name + ' کا کھاتا بک%0A' + 'موجودہ بیلنس: ' + '{:,.0f}'.format(person.current_balance) + ' روپے%0Aسسٹم: اسٹاک مینجمنٹ') | urlencode }}"
+                    <a href="{{ url_for('khata.share_statement_whatsapp', person_type=person_type, person_id=person_id) }}"
                        target="_blank" class="btn-ctrl btn-whatsapp">
                         <i class="bi bi-whatsapp"></i>واٹس ایپ
                     </a>
