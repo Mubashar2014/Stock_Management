@@ -8,7 +8,7 @@ class Config:
     # Format: mysql+mysqlconnector://user:password@host/dbname
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         'DATABASE_URL',
-        'mysql+mysqlconnector://root:Qwerty0.@localhost/stockmaterial_db'
+        'mysql+mysqlconnector://root:afaqmub321@localhost/stockmaterial_db'
     )
 
     # Disable tracking modifications to save memory
