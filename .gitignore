@@ -7,3 +7,5 @@ instance/
 
 # App config (contains DB credentials)
 app/config.py
+run.py
+app/static/uploads/*
