@@ -52,12 +52,20 @@ def index():
         try:
             if form_id:  # EDIT UPDATE
                 entry = Cashbook.query.get_or_404(form_id)
+
+                # Reverse the old balance effect before applying new values
+                _reverse_balance_effect(entry)
+
                 entry.date = transaction_date
                 entry.type = cash_type
                 entry.reference_type = reference_type
                 entry.reference_id = ref_id_val
                 entry.description = description
                 entry.amount = amount
+
+                # Apply new balance effect
+                _apply_balance_effect(entry)
+
                 flash('اندراج کامیابی سے تبدیل ہو گیا!', 'success')
             else:  # NEW ADDITION
                 new_entry = Cashbook(
@@ -65,6 +73,10 @@ def index():
                     reference_type=reference_type, reference_id=ref_id_val, description=description
                 )
                 db.session.add(new_entry)
+
+                # Apply balance effect for new entry
+                _apply_balance_effect(new_entry)
+
                 flash('نیا اندراج کامیابی سے محفوظ ہو گیا!', 'success')
 
             db.session.commit()
@@ -146,6 +158,8 @@ def delete_entry(entry_id):
             return redirect(url_for('cashbook.index'))
 
     try:
+        # Reverse balance effect before deleting
+        _reverse_balance_effect(entry)
         db.session.delete(entry)
         db.session.commit()
         flash('ریکارڈ کامیابی سے ختم کر دیا گیا ہے۔', 'warning')
@@ -153,3 +167,31 @@ def delete_entry(entry_id):
         db.session.rollback()
         flash(f'خرابی: {str(e)}', 'danger')
     return redirect(url_for('cashbook.index'))
+
+
+def _apply_balance_effect(entry):
+    """Reduce supplier/customer current_balance when a payment is recorded."""
+    if entry.reference_type == 'supplier' and entry.reference_id:
+        supplier = Supplier.query.get(entry.reference_id)
+        if supplier:
+            # Any cashbook entry linked to a supplier = payment to supplier → reduce balance
+            supplier.current_balance = Decimal(str(supplier.current_balance)) - Decimal(str(entry.amount))
+
+    elif entry.reference_type == 'customer' and entry.reference_id:
+        customer = Customer.query.get(entry.reference_id)
+        if customer:
+            # Any cashbook entry linked to a customer = payment received → reduce balance
+            customer.current_balance = Decimal(str(customer.current_balance)) - Decimal(str(entry.amount))
+
+
+def _reverse_balance_effect(entry):
+    """Undo a previously applied balance effect (for edit or delete)."""
+    if entry.reference_type == 'supplier' and entry.reference_id:
+        supplier = Supplier.query.get(entry.reference_id)
+        if supplier:
+            supplier.current_balance = Decimal(str(supplier.current_balance)) + Decimal(str(entry.amount))
+
+    elif entry.reference_type == 'customer' and entry.reference_id:
+        customer = Customer.query.get(entry.reference_id)
+        if customer:
+            customer.current_balance = Decimal(str(customer.current_balance)) + Decimal(str(entry.amount))
