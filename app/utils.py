@@ -2,6 +2,7 @@
 import os
 import tempfile
 import base64
+import urllib.parse
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
