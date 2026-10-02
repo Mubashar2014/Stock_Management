@@ -277,7 +277,8 @@ def download_statement_image(person_type, person_id):
 @khata_bp.route('/<string:person_type>/<int:person_id>/whatsapp')
 @login_required
 def share_statement_whatsapp(person_type, person_id):
-    """Download khata statement image for WhatsApp sharing."""
+    """Share khata statement via WhatsApp Web."""
+    from app.utils import send_whatsapp_image_browser
     
     # Validate person_type
     if person_type not in ('supplier', 'customer'):
@@ -289,26 +290,31 @@ def share_statement_whatsapp(person_type, person_id):
     else:
         person = Customer.query.get_or_404(person_id)
     
-    # Create image using PIL
+    # Create message
+    person_label = 'سپلائر' if person_type == 'supplier' else 'گاہک'
+    message = f"""کھاتا سٹیٹمنٹ
+{person_label}: {person.name}
+موجودہ باقیہ رقم: {"{:,.0f}".format(person.current_balance)} روپے
+تاریخ: {datetime.now().strftime('%d-%m-%Y')}"""
+    
+    # Get phone number
+    phone = person.phone if person else ''
+    
+    # Create WhatsApp link
+    wa_data = send_whatsapp_image_browser(phone, message)
+    
+    # Generate image
     image_bytes = create_khata_statement_image(person, person_type)
     
-    # Save to temp file
+    # Save temporary image
     temp_path = save_temp_image(image_bytes, prefix=f'khata_{person_type}_{person_id}')
     
-    # Send file and clean up
-    response = send_file(
-        temp_path,
-        mimetype='image/png',
-        as_attachment=True,
-        download_name=f'khata_statement_{person.name}_{person_id}.png'
+    # Create a temporary URL for download
+    image_download_url = f"{request.host_url}khata/{person_type}/{person_id}/statement-image"
+    
+    return render_template(
+        'whatsapp_share.html',
+        wa_link=wa_data['url'],
+        image_url=image_download_url,
+        filename=f'khata_statement_{person.name}_{person_id}.png'
     )
-    
-    # Schedule cleanup after sending
-    @response.call_on_close
-    def cleanup():
-        try:
-            os.unlink(temp_path)
-        except:
-            pass
-    
-    return response

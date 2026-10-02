@@ -278,3 +278,33 @@ def save_temp_image(image_bytes, prefix='receipt'):
 def image_to_base64(image_bytes):
     """Convert image bytes to base64 string for embedding."""
     return base64.b64encode(image_bytes).decode('utf-8')
+
+
+def send_whatsapp_image_browser(phone, message_text):
+    """
+    Generate WhatsApp Web link with pre-filled message.
+    Image will be downloaded separately and user attaches it.
+    
+    Args:
+        phone: Phone number (with or without country code)
+        message_text: Message to send
+    
+    Returns:
+        dict: {url: whatsapp_url, phone: cleaned_phone}
+    """
+    # Clean phone number
+    if phone:
+        phone = phone.lstrip('0')
+        if not phone.startswith('92'):
+            phone = '92' + phone
+    else:
+        phone = ''
+    
+    # Create WhatsApp URL with message
+    whatsapp_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message_text)}"
+    
+    return {
+        'url': whatsapp_url,
+        'phone': phone,
+        'message': message_text
+    }

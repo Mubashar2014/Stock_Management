@@ -276,29 +276,40 @@ def download_receipt_image(entry_id):
 @stock_in_bp.route('/whatsapp/<int:entry_id>')
 @login_required
 def share_whatsapp(entry_id):
-    """Download receipt image for WhatsApp sharing."""
+    """Share receipt image via WhatsApp Web."""
+    from app.utils import send_whatsapp_image_browser
+    
     entry = StockIn.query.get_or_404(entry_id)
     
-    # Create image using PIL
+    # Create message
+    material_name = entry.material.name if entry.material else 'مٹیریل'
+    message = f"""رسید - خریداری #{entry.id}
+{entry.supplier.name}
+مٹیریل: {material_name}
+مقدار: {entry.quantity} {entry.material.unit if entry.material else ''}
+شرح: {"{:,.0f}".format(entry.rate)} روپے
+کل رقم: {"{:,.0f}".format(entry.total_amount)} روپے
+باقی رقم: {"{:,.0f}".format(entry.remaining)} روپے"""
+    
+    # Get phone number
+    phone = entry.supplier.phone if entry.supplier else ''
+    
+    # Create WhatsApp link
+    wa_data = send_whatsapp_image_browser(phone, message)
+    
+    # Generate image
     image_bytes = create_receipt_image(entry, entry_type='stock_in')
     
-    # Save to temp file
+    # Save temporary image
     temp_path = save_temp_image(image_bytes, prefix=f'stock_in_receipt_{entry.id}')
     
-    # Send file and clean up
-    response = send_file(
-        temp_path,
-        mimetype='image/png',
-        as_attachment=True,
-        download_name=f'receipt_stock_in_{entry.id}.png'
+    # Create a temporary URL for download
+    from flask import url_for as flask_url_for
+    image_download_url = f"{request.host_url}stock-in/receipt/{entry_id}/image"
+    
+    return render_template(
+        'whatsapp_share.html',
+        wa_link=wa_data['url'],
+        image_url=image_download_url,
+        filename=f'receipt_stock_in_{entry.id}.png'
     )
-    
-    # Schedule cleanup after sending
-    @response.call_on_close
-    def cleanup():
-        try:
-            os.unlink(temp_path)
-        except:
-            pass
-    
-    return response
