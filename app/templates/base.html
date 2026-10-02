@@ -693,6 +693,10 @@
                class="sb-link {% if 'cashbook' in (request.endpoint or '') %}active{% endif %}">
                 <i class="bi bi-cash-stack"></i><span>کیش بک</span>
             </a>
+            <a href="{{ url_for('profit.index') }}"
+               class="sb-link {% if 'profit' in (request.endpoint or '') %}active{% endif %}">
+                <i class="bi bi-graph-up-arrow"></i><span>نفع / نقصان</span>
+            </a>
 
         </nav>
 
