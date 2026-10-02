@@ -167,9 +167,9 @@
         
         <div class="info-box">
             <strong>⏱️ یہ عمل مکمل ہوگا:</strong>
-            <p id="steps">1. تصویر ڈاؤن لوڈ ہوگی</p>
-            <p>2. واٹس ایپ کھل جائے گی</p>
-            <p>3. تصویر منسلک کر کے بھیجیں</p>
+            <p id="steps">1. تصویر خودکار ڈاؤن لوڈ ہوگی</p>
+            <p>2. واٹس ایپ ڈیسک ٹاپ خودکار کھل جائے گا</p>
+            <p>3. تصویر منسلک کر کے براہ راست بھیجیں</p>
         </div>
         
         <div class="button-group" id="buttons" style="display: none;">
@@ -202,9 +202,27 @@
                 document.body.removeChild(link);
             }
             
-            // Auto-open WhatsApp after a short delay
+            // Auto-open WhatsApp Desktop after a short delay
+            // Desktop URL scheme: whatsapp://send?phone=...
+            // If WhatsApp Desktop is not installed, it will fail silently and user can use Web
             setTimeout(function() {
-                window.open("{{ wa_link }}", '_blank');
+                const desktopLink = "{{ wa_link }}";
+                const webLink = "{{ wa_web_link | default('') }}";
+                
+                // Try to open Desktop first
+                if (desktopLink && desktopLink.startsWith('whatsapp://')) {
+                    window.location.href = desktopLink;
+                    
+                    // Fallback to Web if Desktop doesn't open in 2 seconds
+                    setTimeout(function() {
+                        if (webLink) {
+                            window.open(webLink, '_blank');
+                        }
+                    }, 2000);
+                } else if (webLink) {
+                    // If no Desktop link, use Web directly
+                    window.open(webLink, '_blank');
+                }
             }, 500);
         }, 1000);
     </script>

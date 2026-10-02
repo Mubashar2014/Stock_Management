@@ -272,12 +272,12 @@ def download_receipt_image(entry_id):
     return response
 
 
-# 7. WHATSAPP SHARE (Image-based)
+# 7. WHATSAPP SHARE (Image-based with Desktop + Web fallback)
 @stock_in_bp.route('/whatsapp/<int:entry_id>')
 @login_required
 def share_whatsapp(entry_id):
-    """Share receipt image via WhatsApp Web."""
-    from app.utils import send_whatsapp_image_browser
+    """Share receipt image via WhatsApp Desktop or Web."""
+    from app.utils import get_whatsapp_desktop_link
     
     entry = StockIn.query.get_or_404(entry_id)
     
@@ -294,8 +294,8 @@ def share_whatsapp(entry_id):
     # Get phone number
     phone = entry.supplier.phone if entry.supplier else ''
     
-    # Create WhatsApp link
-    wa_data = send_whatsapp_image_browser(phone, message)
+    # Create WhatsApp links (Desktop primary, Web fallback)
+    wa_data = get_whatsapp_desktop_link(phone, message)
     
     # Generate image
     image_bytes = create_receipt_image(entry, entry_type='stock_in')
@@ -308,7 +308,8 @@ def share_whatsapp(entry_id):
     
     return render_template(
         'whatsapp_share.html',
-        wa_link=wa_data['url'],
+        wa_link=wa_data['desktop_url'],
+        wa_web_link=wa_data['web_url'],
         image_url=image_download_url,
         filename=f'receipt_stock_in_{entry.id}.png'
     )

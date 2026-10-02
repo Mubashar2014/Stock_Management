@@ -309,3 +309,35 @@ def send_whatsapp_image_browser(phone, message_text):
         'phone': phone,
         'message': message_text
     }
+
+
+def get_whatsapp_desktop_link(phone, message_text):
+    """
+    Generate link to open WhatsApp Desktop with message.
+    
+    Args:
+        phone: Phone number (with or without country code)
+        message_text: Message to send
+    
+    Returns:
+        dict: {desktop_url: whatsapp_desktop_url, web_url: whatsapp_web_url, phone: cleaned_phone}
+    """
+    # Clean phone number
+    if phone:
+        phone = phone.lstrip('0')
+        if not phone.startswith('92'):
+            phone = '92' + phone
+    else:
+        phone = ''
+    
+    # WhatsApp Desktop URL scheme (works on Windows, macOS, Linux)
+    # Note: WhatsApp Desktop must be installed
+    desktop_url = f"whatsapp://send?phone={phone}&text={urllib.parse.quote(message_text)}"
+    web_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message_text)}"
+    
+    return {
+        'desktop_url': desktop_url,
+        'web_url': web_url,
+        'phone': phone,
+        'message': message_text
+    }

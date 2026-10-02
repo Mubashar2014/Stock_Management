@@ -277,8 +277,8 @@ def download_statement_image(person_type, person_id):
 @khata_bp.route('/<string:person_type>/<int:person_id>/whatsapp')
 @login_required
 def share_statement_whatsapp(person_type, person_id):
-    """Share khata statement via WhatsApp Web."""
-    from app.utils import send_whatsapp_image_browser
+    """Share khata statement via WhatsApp Desktop or Web."""
+    from app.utils import get_whatsapp_desktop_link
     
     # Validate person_type
     if person_type not in ('supplier', 'customer'):
@@ -300,8 +300,8 @@ def share_statement_whatsapp(person_type, person_id):
     # Get phone number
     phone = person.phone if person else ''
     
-    # Create WhatsApp link
-    wa_data = send_whatsapp_image_browser(phone, message)
+    # Create WhatsApp links (Desktop primary, Web fallback)
+    wa_data = get_whatsapp_desktop_link(phone, message)
     
     # Generate image
     image_bytes = create_khata_statement_image(person, person_type)
@@ -314,7 +314,8 @@ def share_statement_whatsapp(person_type, person_id):
     
     return render_template(
         'whatsapp_share.html',
-        wa_link=wa_data['url'],
+        wa_link=wa_data['desktop_url'],
+        wa_web_link=wa_data['web_url'],
         image_url=image_download_url,
         filename=f'khata_statement_{person.name}_{person_id}.png'
     )
