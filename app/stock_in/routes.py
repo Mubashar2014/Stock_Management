@@ -304,7 +304,6 @@ def share_whatsapp(entry_id):
     temp_path = save_temp_image(image_bytes, prefix=f'stock_in_receipt_{entry.id}')
     
     # Create a temporary URL for download
-    from flask import url_for as flask_url_for
     image_download_url = f"{request.host_url}stock-in/receipt/{entry_id}/image"
     
     return render_template(
