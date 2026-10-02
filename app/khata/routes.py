@@ -210,7 +210,12 @@ def khata_detail(person_type, person_id):
             balance = balance + row['debit'] - row['credit']
             row['balance'] = balance
 
-    closing_balance = balance
+    # If no date filters applied, use database current_balance directly
+    if not start_dt and not end_dt:
+        closing_balance = Decimal(str(person.current_balance))
+    else:
+        # With filters, use calculated balance
+        closing_balance = balance
 
     return render_template(
         'khata/index.html',
@@ -272,7 +277,7 @@ def download_statement_image(person_type, person_id):
 @khata_bp.route('/<string:person_type>/<int:person_id>/whatsapp')
 @login_required
 def share_statement_whatsapp(person_type, person_id):
-    """Share Khata statement via WhatsApp."""
+    """Download khata statement image for WhatsApp sharing."""
     
     # Validate person_type
     if person_type not in ('supplier', 'customer'):
@@ -284,26 +289,26 @@ def share_statement_whatsapp(person_type, person_id):
     else:
         person = Customer.query.get_or_404(person_id)
     
-    # Get phone number
-    phone = person.phone
-    if phone:
-        # Clean phone number - remove leading 0 and add 92
-        phone = phone.lstrip('0')
-        if not phone.startswith('92'):
-            phone = '92' + phone
-    else:
-        phone = ''
+    # Create image using PIL
+    image_bytes = create_khata_statement_image(person, person_type)
     
-    # Create simple message with statement download link
-    person_label = 'سپلائر' if person_type == 'supplier' else 'گاہک'
-    message = f"""کھاتا سٹیٹمنٹ
-{person_label}: {person.name}
-موجودہ باقیہ رقم: {"{:,.0f}".format(person.current_balance)} روپے
-
-سٹیٹمنٹ ڈاؤن لوڈ کریں:
-{request.host_url}khata/{person_type}/{person_id}/statement-image"""
+    # Save to temp file
+    temp_path = save_temp_image(image_bytes, prefix=f'khata_{person_type}_{person_id}')
     
-    # WhatsApp URL
-    whatsapp_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message)}"
+    # Send file and clean up
+    response = send_file(
+        temp_path,
+        mimetype='image/png',
+        as_attachment=True,
+        download_name=f'khata_statement_{person.name}_{person_id}.png'
+    )
     
-    return redirect(whatsapp_url)
+    # Schedule cleanup after sending
+    @response.call_on_close
+    def cleanup():
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
+    
+    return response

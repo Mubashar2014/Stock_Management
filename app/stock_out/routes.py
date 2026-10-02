@@ -301,28 +301,29 @@ def download_receipt_image(entry_id):
 @stock_out_bp.route('/whatsapp/<int:entry_id>')
 @login_required
 def share_whatsapp(entry_id):
-    """Share receipt image via WhatsApp."""
+    """Download receipt image for WhatsApp sharing."""
     entry = StockOut.query.get_or_404(entry_id)
     
-    # Get customer phone number
-    phone = entry.customer.phone
-    if phone:
-        # Clean phone number - remove leading 0 and add 92
-        phone = phone.lstrip('0')
-        if not phone.startswith('92'):
-            phone = '92' + phone
-    else:
-        phone = ''
+    # Create image using PIL
+    image_bytes = create_receipt_image(entry, entry_type='stock_out')
     
-    # Create simple message with receipt download link
-    message = f"""رسید - فروخت #{entry.id}
-{entry.customer.name}
-باقی رقم: {"{:,.0f}".format(entry.remaining)} روپے
-
-رسید ڈاؤن لوڈ کریں:
-{request.host_url}stock-out/receipt/{entry.id}/image"""
+    # Save to temp file
+    temp_path = save_temp_image(image_bytes, prefix=f'stock_out_receipt_{entry.id}')
     
-    # WhatsApp URL (user will need to manually attach the downloaded image)
-    whatsapp_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message)}"
+    # Send file and clean up
+    response = send_file(
+        temp_path,
+        mimetype='image/png',
+        as_attachment=True,
+        download_name=f'receipt_stock_out_{entry.id}.png'
+    )
     
-    return redirect(whatsapp_url)
+    # Schedule cleanup after sending
+    @response.call_on_close
+    def cleanup():
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
+    
+    return response
