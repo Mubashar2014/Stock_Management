@@ -31,8 +31,8 @@ class Supplier(db.Model):
     address = db.Column(db.Text, nullable=True)
 
     # Yeh columns lazmi check karein ke isi naam se hain ya nahi:
-    opening_balance = db.Column(db.Float, default=0.0)
-    current_balance = db.Column(db.Float, default=0.0)
+    opening_balance = db.Column(db.Numeric(12, 2), default=0.0)
+    current_balance = db.Column(db.Numeric(12, 2), default=0.0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -48,8 +48,8 @@ class Customer(db.Model):
     name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(30), nullable=True)
     address = db.Column(db.Text, nullable=True)
-    opening_balance = db.Column(db.Float, default=0.0)  # Shuruati khata
-    current_balance = db.Column(db.Float, default=0.0)  # Live khata
+    opening_balance = db.Column(db.Numeric(12, 2), default=0.0)  # Shuruati khata
+    current_balance = db.Column(db.Numeric(12, 2), default=0.0)  # Live khata
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships

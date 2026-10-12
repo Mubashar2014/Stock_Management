@@ -1,9 +1,11 @@
-from flask import Flask, redirect, url_for
+from flask import Flask, redirect, url_for, render_template, jsonify
 from app.config import Config
 from app.db import db, migrate
 from flask_login import LoginManager, current_user
+import logging
 
 login_manager = LoginManager()
+logger = logging.getLogger(__name__)
 
 
 def create_app():
@@ -12,6 +14,10 @@ def create_app():
 
     db.init_app(app)
     migrate.init_app(app, db)
+
+    # Setup logging
+    if not app.debug:
+        logging.basicConfig(level=logging.INFO)
 
     # Login Manager Setup
     login_manager.init_app(app)
@@ -23,6 +29,30 @@ def create_app():
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
+
+    # Error handlers
+    @app.errorhandler(404)
+    def page_not_found(e):
+        return render_template('404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        db.session.rollback()
+        logger.error(f'Internal error: {str(e)}')
+        return render_template('500.html'), 500
+
+    @app.errorhandler(400)
+    def bad_request(e):
+        return render_template('400.html'), 400
+
+    @app.before_request
+    def before_request():
+        """Ensure database connection is available"""
+        try:
+            db.session.execute('SELECT 1')
+        except Exception as e:
+            logger.error(f'Database connection error: {str(e)}')
+            db.session.rollback()
 
     # Blueprints Import aur Registration (As per your base.html names)
     from app.auth.routes import auth_bp

@@ -70,10 +70,11 @@ def add_stock_in():
                 remaining=remaining, date=transaction_date, notes=notes
             )
             db.session.add(new_entry)
+            db.session.flush()  # Get the ID before updating balance
 
             supplier = Supplier.query.get(supplier_id)
             if supplier:
-                supplier.current_balance += float(remaining)
+                supplier.current_balance = Decimal(str(supplier.current_balance or 0)) + Decimal(str(remaining))
 
             # Auto-create Cashbook entry if payment was made
             if paid_amount > 0:
@@ -134,12 +135,12 @@ def edit_stock_in(entry_id):
         try:
             old_paid_amount = entry.paid_amount
             
-            # Step A: Purane balance ka asar khatam (Reverse) karna
+            # Step A: Reverse old balance effect - CRITICAL
             old_supplier = Supplier.query.get(old_supplier_id)
             if old_supplier:
-                old_supplier.current_balance -= float(old_remaining)
+                old_supplier.current_balance = Decimal(str(old_supplier.current_balance or 0)) - Decimal(str(old_remaining))
 
-            # Step B: Data update karna
+            # Step B: Update entry data
             entry.supplier_id = supplier_id
             entry.material_id = material_id
             entry.quantity = quantity
@@ -152,10 +153,10 @@ def edit_stock_in(entry_id):
             entry.date = datetime.strptime(date_str, '%Y-%m-%d').date()
             entry.notes = notes
 
-            # Step C: Naye balance ka asar supplier par apply karna
+            # Step C: Apply new balance effect to supplier
             new_supplier = Supplier.query.get(supplier_id)
             if new_supplier:
-                new_supplier.current_balance += float(new_remaining)
+                new_supplier.current_balance = Decimal(str(new_supplier.current_balance or 0)) + Decimal(str(new_remaining))
 
             # Step D: Update Cashbook entries for payment changes
             # Delete old cashbook entry if it exists
@@ -206,7 +207,7 @@ def delete_stock_in(entry_id):
     try:
         supplier = Supplier.query.get(entry.supplier_id)
         if supplier:
-            supplier.current_balance -= float(entry.remaining)
+            supplier.current_balance = Decimal(str(supplier.current_balance or 0)) - Decimal(str(entry.remaining))
 
         # Delete associated cashbook entry if payment was made
         if entry.paid_amount > 0:
@@ -244,21 +245,21 @@ def view_receipt(entry_id):
 @stock_in_bp.route('/receipt/<int:entry_id>/image')
 @login_required
 def download_receipt_image(entry_id):
-    """Generate and download receipt as PNG image."""
+    """Generate and download receipt as PDF."""
     entry = StockIn.query.get_or_404(entry_id)
     
-    # Create image using PIL
-    image_bytes = create_receipt_image(entry, entry_type='stock_in')
+    # Create PDF using ReportLab
+    pdf_bytes = create_receipt_image(entry, entry_type='stock_in')
     
     # Save to temp file
-    temp_path = save_temp_image(image_bytes, prefix=f'stock_in_receipt_{entry.id}')
+    temp_path = save_temp_image(pdf_bytes, prefix=f'stock_in_receipt_{entry.id}', is_pdf=True)
     
     # Send file and clean up
     response = send_file(
         temp_path,
-        mimetype='image/png',
+        mimetype='application/pdf',
         as_attachment=True,
-        download_name=f'receipt_stock_in_{entry.id}.png'
+        download_name=f'receipt_stock_in_{entry.id}.pdf'
     )
     
     # Schedule cleanup after sending

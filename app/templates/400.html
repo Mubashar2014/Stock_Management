@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5 text-center">
+    <h1 class="display-1">400</h1>
+    <p class="fs-3"><span class="text-danger">غلط درخواست</span></p>
+    <p class="lead">آپ کی درخواست غلط ہے۔</p>
+    <a href="{{ url_for('index') }}" class="btn btn-primary">ہوم پر واپس جائیں</a>
+</div>
+{% endblock %}

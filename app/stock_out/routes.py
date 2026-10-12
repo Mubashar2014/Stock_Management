@@ -82,10 +82,11 @@ def add_stock_out():
                 remaining=remaining, date=transaction_date, notes=notes
             )
             db.session.add(new_entry)
+            db.session.flush()
 
             customer = Customer.query.get(customer_id)
             if customer:
-                customer.current_balance += float(remaining)
+                customer.current_balance = Decimal(str(customer.current_balance or 0)) + Decimal(str(remaining))
 
             # Auto-create Cashbook entry if payment was received
             if paid_amount > 0:
@@ -166,7 +167,7 @@ def edit_stock_out(entry_id):
             old_paid_amount = entry.paid_amount
             old_customer = Customer.query.get(old_customer_id)
             if old_customer:
-                old_customer.current_balance -= float(old_remaining)
+                old_customer.current_balance = Decimal(str(old_customer.current_balance or 0)) - Decimal(str(old_remaining))
 
             entry.customer_id = customer_id
             entry.material_id = material_id
@@ -183,7 +184,7 @@ def edit_stock_out(entry_id):
 
             new_customer = Customer.query.get(customer_id)
             if new_customer:
-                new_customer.current_balance += float(new_remaining)
+                new_customer.current_balance = Decimal(str(new_customer.current_balance or 0)) + Decimal(str(new_remaining))
 
             # Update Cashbook entries for payment changes
             # Delete old cashbook entry if it exists
@@ -231,7 +232,7 @@ def delete_stock_out(entry_id):
     try:
         customer = Customer.query.get(entry.customer_id)
         if customer:
-            customer.current_balance -= float(entry.remaining)
+            customer.current_balance = Decimal(str(customer.current_balance or 0)) - Decimal(str(entry.remaining))
 
         # Delete associated cashbook entry if payment was received
         if entry.paid_amount > 0:
@@ -269,21 +270,21 @@ def view_receipt(entry_id):
 @stock_out_bp.route('/receipt/<int:entry_id>/image')
 @login_required
 def download_receipt_image(entry_id):
-    """Generate and download receipt as PNG image."""
+    """Generate and download receipt as PDF."""
     entry = StockOut.query.get_or_404(entry_id)
     
-    # Create image using PIL
-    image_bytes = create_receipt_image(entry, entry_type='stock_out')
+    # Create PDF using ReportLab
+    pdf_bytes = create_receipt_image(entry, entry_type='stock_out')
     
     # Save to temp file
-    temp_path = save_temp_image(image_bytes, prefix=f'stock_out_receipt_{entry.id}')
+    temp_path = save_temp_image(pdf_bytes, prefix=f'stock_out_receipt_{entry.id}', is_pdf=True)
     
     # Send file and clean up
     response = send_file(
         temp_path,
-        mimetype='image/png',
+        mimetype='application/pdf',
         as_attachment=True,
-        download_name=f'receipt_stock_out_{entry.id}.png'
+        download_name=f'receipt_stock_out_{entry.id}.pdf'
     )
     
     # Schedule cleanup after sending

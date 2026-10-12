@@ -4,271 +4,331 @@ import tempfile
 import base64
 import urllib.parse
 from io import BytesIO
-from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
+from decimal import Decimal
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import arabic_reshaper
 
 
-def create_receipt_image(entry, entry_type='stock_in'):
+def register_urdu_font():
+    """Register Urdu font for PDF generation."""
+    try:
+        font_path = "/usr/share/fonts/truetype/noto/NotoSansUrdu-Regular.ttf"
+        if not os.path.exists(font_path):
+            # Fallback to any available Urdu font
+            font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        pdfmetrics.registerFont(TTFont('Urdu', font_path))
+        return 'Urdu'
+    except:
+        return 'Helvetica'
+
+
+def create_receipt_pdf(entry, entry_type='stock_in'):
     """
-    Create receipt image using Pillow (PIL).
+    Create receipt PDF using ReportLab with Urdu support.
     
     Args:
         entry: StockIn or StockOut entry
         entry_type: 'stock_in' or 'stock_out'
     
     Returns:
-        bytes: PNG image data
+        bytes: PDF data
     """
-    # Image dimensions
-    width = 800
-    height = 1000
+    urdu_font = register_urdu_font()
     
-    # Colors
-    if entry_type == 'stock_in':
-        gradient_start = (102, 126, 234)  # Purple
-        gradient_end = (118, 75, 162)
-    else:
-        gradient_start = (17, 153, 142)  # Teal
-        gradient_end = (56, 239, 125)  # Green
+    pdf_io = BytesIO()
+    doc = SimpleDocTemplate(pdf_io, pagesize=letter, rightMargin=0.5*inch, leftMargin=0.5*inch,
+                            topMargin=0.75*inch, bottomMargin=0.75*inch)
     
-    # Create image
-    img = Image.new('RGB', (width, height), 'white')
-    draw = ImageDraw.Draw(img)
+    styles = getSampleStyleSheet()
+    story = []
     
-    # Try to load fonts (with fallback)
-    try:
-        font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
-        font_medium = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
-        font_normal = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
-        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-    except:
-        font_large = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
-        font_normal = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=20,
+        textColor=colors.HexColor('#667eea'),
+        spaceAfter=12,
+        alignment=1
+    )
     
-    # Draw gradient header
-    for y in range(200):
-        ratio = y / 200
-        r = int(gradient_start[0] * (1 - ratio) + gradient_end[0] * ratio)
-        g = int(gradient_start[1] * (1 - ratio) + gradient_end[1] * ratio)
-        b = int(gradient_start[2] * (1 - ratio) + gradient_end[2] * ratio)
-        draw.rectangle([(0, y), (width, y+1)], fill=(r, g, b))
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#333333'),
+        spaceAfter=8,
+        fontName=urdu_font
+    )
     
-    # Header text
-    draw.text((width//2, 50), "Sher Ali Building Material", font=font_medium, fill='white', anchor='mm')
-    receipt_type = "Purchase Receipt" if entry_type == 'stock_in' else "Sales Receipt"
-    draw.text((width//2, 90), receipt_type, font=font_normal, fill='white', anchor='mm')
-    draw.text((width//2, 130), f"Receipt #{entry.id}", font=font_normal, fill='white', anchor='mm')
-    draw.text((width//2, 165), entry.date.strftime('%d/%m/%Y'), font=font_small, fill='white', anchor='mm')
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=11,
+        fontName=urdu_font,
+        spaceAfter=6
+    )
     
-    # Body starts at y=220
-    y_pos = 240
-    x_margin = 50
+    # Header
+    title = "Sher Ali Building Material"
+    receipt_type = "رسید - خریداری" if entry_type == 'stock_in' else "رسید - فروخت"
+    
+    story.append(Paragraph(title, title_style))
+    story.append(Paragraph(receipt_type, heading_style))
+    story.append(Spacer(1, 0.2*inch))
+    
+    # Receipt info table
+    info_data = [
+        [Paragraph("رسید نمبر:", normal_style), Paragraph(f"#{entry.id}", normal_style)],
+        [Paragraph("تاریخ:", normal_style), Paragraph(entry.date.strftime('%d/%m/%Y'), normal_style)],
+    ]
+    
+    info_table = Table(info_data, colWidths=[2*inch, 2*inch])
+    info_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8f9fa')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 0.2*inch))
     
     # Person info
     if entry_type == 'stock_in':
         person = entry.supplier
-        person_label = "Supplier"
+        person_label = "سپلائر:"
     else:
         person = entry.customer
-        person_label = "Customer"
+        person_label = "گاہک:"
     
-    draw.text((x_margin, y_pos), f"{person_label}:", font=font_normal, fill='#333')
-    draw.text((width - x_margin, y_pos), person.name, font=font_normal, fill='#000', anchor='rm')
-    y_pos += 40
+    person_data = [
+        [Paragraph(person_label, normal_style), Paragraph(person.name, normal_style)],
+        [Paragraph("فون:", normal_style), Paragraph(person.phone or '-', normal_style)],
+    ]
     
-    if person.phone:
-        draw.text((x_margin, y_pos), "Phone:", font=font_normal, fill='#333')
-        draw.text((width - x_margin, y_pos), person.phone, font=font_normal, fill='#000', anchor='rm')
-        y_pos += 40
-    
-    # Separator line
-    draw.line([(x_margin, y_pos), (width - x_margin, y_pos)], fill='#ddd', width=2)
-    y_pos += 30
+    person_table = Table(person_data, colWidths=[2*inch, 2*inch])
+    person_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#e9ecef')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ]))
+    story.append(person_table)
+    story.append(Spacer(1, 0.2*inch))
     
     # Material details
-    draw.text((x_margin, y_pos), "Material:", font=font_normal, fill='#333')
-    draw.text((width - x_margin, y_pos), entry.material.name, font=font_normal, fill='#000', anchor='rm')
-    y_pos += 40
+    material_data = [
+        [Paragraph("مٹیریل:", normal_style), Paragraph(entry.material.name, normal_style)],
+        [Paragraph("مقدار:", normal_style), Paragraph(f"{entry.quantity} {entry.material.unit}", normal_style)],
+        [Paragraph("شرح:", normal_style), Paragraph(f"Rs. {entry.rate:,.0f}", normal_style)],
+    ]
     
-    draw.text((x_margin, y_pos), "Quantity:", font=font_normal, fill='#333')
-    draw.text((width - x_margin, y_pos), f"{entry.quantity} {entry.material.unit}", font=font_normal, fill='#000', anchor='rm')
-    y_pos += 40
+    material_table = Table(material_data, colWidths=[2*inch, 2*inch])
+    material_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0f0f0')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ]))
+    story.append(material_table)
+    story.append(Spacer(1, 0.25*inch))
     
-    draw.text((x_margin, y_pos), "Rate:", font=font_normal, fill='#333')
-    draw.text((width - x_margin, y_pos), f"Rs. {entry.rate:,.0f}", font=font_normal, fill='#000', anchor='rm')
-    y_pos += 50
+    # Financial summary
+    subtotal = Decimal(str(entry.quantity)) * Decimal(str(entry.rate))
     
-    # Financial summary box
-    draw.rectangle([(x_margin, y_pos), (width - x_margin, y_pos + 250)], outline='#ddd', width=2)
-    y_pos += 20
-    
-    draw.text((x_margin + 20, y_pos), "Subtotal:", font=font_normal, fill='#666')
-    draw.text((width - x_margin - 20, y_pos), f"Rs. {(entry.quantity * entry.rate):,.0f}", font=font_normal, fill='#000', anchor='rm')
-    y_pos += 40
+    financial_data = [
+        [Paragraph("ذیلی کل:", normal_style), Paragraph(f"Rs. {subtotal:,.0f}", normal_style)],
+    ]
     
     if entry.other_expenses > 0:
-        draw.text((x_margin + 20, y_pos), "Other Expenses:", font=font_normal, fill='#666')
-        draw.text((width - x_margin - 20, y_pos), f"Rs. {entry.other_expenses:,.0f}", font=font_normal, fill='#000', anchor='rm')
-        y_pos += 40
+        financial_data.append([Paragraph("دیگر اخراجات:", normal_style), 
+                               Paragraph(f"Rs. {entry.other_expenses:,.0f}", normal_style)])
     
     if hasattr(entry, 'discount') and entry.discount > 0:
-        draw.text((x_margin + 20, y_pos), "Discount:", font=font_normal, fill='#666')
-        draw.text((width - x_margin - 20, y_pos), f"- Rs. {entry.discount:,.0f}", font=font_normal, fill='#dc3545', anchor='rm')
-        y_pos += 40
+        financial_data.append([Paragraph("رعایت:", normal_style), 
+                               Paragraph(f"Rs. {entry.discount:,.0f}", normal_style)])
     
-    # Separator
-    draw.line([(x_margin + 20, y_pos), (width - x_margin - 20, y_pos)], fill='#999', width=2)
-    y_pos += 15
+    financial_data.append([Paragraph("کل رقم:", normal_style), 
+                          Paragraph(f"Rs. {entry.total_amount:,.0f}", normal_style)])
+    financial_data.append([Paragraph("وصول شدہ:", normal_style), 
+                          Paragraph(f"Rs. {entry.paid_amount:,.0f}", normal_style)])
+    financial_data.append([Paragraph("باقی رقم:", normal_style), 
+                          Paragraph(f"Rs. {entry.remaining:,.0f}", normal_style)])
     
-    draw.text((x_margin + 20, y_pos), "TOTAL:", font=font_medium, fill='#000')
-    draw.text((width - x_margin - 20, y_pos), f"Rs. {entry.total_amount:,.0f}", font=font_medium, fill=gradient_start, anchor='rm')
-    y_pos += 45
-    
-    draw.text((x_margin + 20, y_pos), "Paid:", font=font_normal, fill='#666')
-    draw.text((width - x_margin - 20, y_pos), f"Rs. {entry.paid_amount:,.0f}", font=font_normal, fill='#28a745', anchor='rm')
-    y_pos += 60
-    
-    # Remaining amount highlight box
-    box_y = y_pos
-    draw.rectangle([(x_margin, box_y), (width - x_margin, box_y + 120)], fill=gradient_start)
-    
-    draw.text((width//2, box_y + 30), "REMAINING AMOUNT", font=font_normal, fill='white', anchor='mm')
-    draw.text((width//2, box_y + 75), f"Rs. {entry.remaining:,.0f}", font=font_large, fill='white', anchor='mm')
+    financial_table = Table(financial_data, colWidths=[2.5*inch, 1.5*inch])
+    financial_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e9ecef')),
+        ('BACKGROUND', (1, 0), (1, -3), colors.white),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#667eea')),
+        ('TEXTCOLOR', (0, -1), (-1, -1), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTSIZE', (0, -1), (-1, -1), 12),
+        ('BOLD', (0, -1), (-1, -1), True),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ]))
+    story.append(financial_table)
+    story.append(Spacer(1, 0.3*inch))
     
     # Footer
-    y_pos = box_y + 140
-    draw.text((width//2, y_pos), "Thank you for your business!", font=font_small, fill='#666', anchor='mm')
-    draw.text((width//2, y_pos + 25), "Sher Ali Building Material", font=font_small, fill='#999', anchor='mm')
+    story.append(Paragraph("شکریہ آپ کے کاروبار کے لیے!", normal_style))
+    story.append(Paragraph("Sher Ali Building Material - Stock Management System", styles['Normal']))
     
-    # Convert to bytes
-    img_io = BytesIO()
-    img.save(img_io, 'PNG', quality=95)
-    img_io.seek(0)
-    return img_io.getvalue()
+    doc.build(story)
+    pdf_io.seek(0)
+    return pdf_io.getvalue()
 
 
-def create_khata_statement_image(person, person_type):
+def create_receipt_image(entry, entry_type='stock_in'):
     """
-    Create Khata statement image using Pillow (PIL).
+    DEPRECATED: Use create_receipt_pdf instead.
+    Kept for backwards compatibility.
+    """
+    return create_receipt_pdf(entry, entry_type)
+
+
+def create_khata_statement_pdf(person, person_type):
+    """
+    Create Khata statement PDF using ReportLab with Urdu support.
     
     Args:
         person: Supplier or Customer object
         person_type: 'supplier' or 'customer'
     
     Returns:
-        bytes: PNG image data
+        bytes: PDF data
     """
-    # Image dimensions
-    width = 800
-    height = 800
+    urdu_font = register_urdu_font()
     
-    # Colors
-    if person_type == 'supplier':
-        gradient_start = (102, 126, 234)  # Purple
-        gradient_end = (118, 75, 162)
-    else:
-        gradient_start = (17, 153, 142)  # Teal
-        gradient_end = (56, 239, 125)
+    pdf_io = BytesIO()
+    doc = SimpleDocTemplate(pdf_io, pagesize=letter, rightMargin=0.5*inch, leftMargin=0.5*inch,
+                            topMargin=0.75*inch, bottomMargin=0.75*inch)
     
-    # Create image
-    img = Image.new('RGB', (width, height), 'white')
-    draw = ImageDraw.Draw(img)
+    styles = getSampleStyleSheet()
+    story = []
     
-    # Try to load fonts
-    try:
-        font_xlarge = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 50)
-        font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
-        font_medium = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
-        font_normal = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
-        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-    except:
-        font_xlarge = ImageFont.load_default()
-        font_large = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
-        font_normal = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#667eea'),
+        spaceAfter=12,
+        alignment=1
+    )
     
-    # Draw gradient header
-    for y in range(180):
-        ratio = y / 180
-        r = int(gradient_start[0] * (1 - ratio) + gradient_end[0] * ratio)
-        g = int(gradient_start[1] * (1 - ratio) + gradient_end[1] * ratio)
-        b = int(gradient_start[2] * (1 - ratio) + gradient_end[2] * ratio)
-        draw.rectangle([(0, y), (width, y+1)], fill=(r, g, b))
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=11,
+        fontName=urdu_font,
+        spaceAfter=6
+    )
     
-    # Header text
-    draw.text((width//2, 50), "Sher Ali Building Material", font=font_medium, fill='white', anchor='mm')
-    draw.text((width//2, 90), "Account Statement", font=font_normal, fill='white', anchor='mm')
-    person_label = "Supplier" if person_type == 'supplier' else "Customer"
-    draw.text((width//2, 135), f"{person_label} Account", font=font_small, fill='white', anchor='mm')
+    # Header
+    title = "Sher Ali Building Material"
+    statement_type = "بیان - سپلائر" if person_type == 'supplier' else "بیان - گاہک"
     
-    # Body starts at y=200
-    y_pos = 220
-    x_margin = 60
+    story.append(Paragraph(title, title_style))
+    story.append(Paragraph(statement_type, title_style))
+    story.append(Spacer(1, 0.2*inch))
     
-    # Person info box
-    box_height = 200
-    draw.rectangle([(x_margin, y_pos), (width - x_margin, y_pos + box_height)], fill='#f8f9fa', outline='#ddd', width=2)
+    # Person info
+    person_label = "سپلائر:" if person_type == 'supplier' else "گاہک:"
+    person_data = [
+        [Paragraph("نام:", normal_style), Paragraph(person.name, normal_style)],
+        [Paragraph("فون:", normal_style), Paragraph(person.phone or '-', normal_style)],
+        [Paragraph("پتہ:", normal_style), Paragraph(person.address or '-', normal_style)],
+        [Paragraph("تاریخ:", normal_style), Paragraph(datetime.now().strftime('%d/%m/%Y'), normal_style)],
+    ]
     
-    y_pos += 25
-    draw.text((x_margin + 30, y_pos), "Name:", font=font_normal, fill='#666')
-    draw.text((width - x_margin - 30, y_pos), person.name, font=font_medium, fill='#000', anchor='rm')
-    y_pos += 50
+    person_table = Table(person_data, colWidths=[1.5*inch, 3.5*inch])
+    person_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8f9fa')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ]))
+    story.append(person_table)
+    story.append(Spacer(1, 0.3*inch))
     
-    if person.phone:
-        draw.text((x_margin + 30, y_pos), "Phone:", font=font_normal, fill='#666')
-        draw.text((width - x_margin - 30, y_pos), person.phone, font=font_normal, fill='#000', anchor='rm')
-        y_pos += 50
+    # Balance display
+    balance_status = "روپے واجب الادا" if person.current_balance > 0 else "صاف ستھرا"
+    current_balance = Decimal(str(person.current_balance))
     
-    if person.address:
-        draw.text((x_margin + 30, y_pos), "Address:", font=font_normal, fill='#666')
-        # Truncate long addresses
-        addr = person.address[:40] + '...' if len(person.address) > 40 else person.address
-        draw.text((width - x_margin - 30, y_pos), addr, font=font_normal, fill='#000', anchor='rm')
-        y_pos += 50
+    balance_data = [
+        [Paragraph("موجودہ بیلنس:", ParagraphStyle('Bold', parent=normal_style, fontSize=14, bold=True)), 
+         Paragraph(f"Rs. {current_balance:,.0f}", ParagraphStyle('Bold', parent=normal_style, fontSize=14, bold=True))],
+        [Paragraph("حالت:", normal_style), Paragraph(balance_status, normal_style)],
+    ]
     
-    now = datetime.now()
-    draw.text((x_margin + 30, y_pos), "Date:", font=font_normal, fill='#666')
-    draw.text((width - x_margin - 30, y_pos), now.strftime('%d/%m/%Y'), font=font_normal, fill='#000', anchor='rm')
-    
-    # Balance box
-    y_pos = 450
-    box_height = 220
-    draw.rectangle([(x_margin, y_pos), (width - x_margin, y_pos + box_height)], fill=gradient_start)
-    
-    draw.text((width//2, y_pos + 40), "CURRENT BALANCE", font=font_medium, fill='white', anchor='mm')
-    draw.text((width//2, y_pos + 120), f"Rs. {person.current_balance:,.0f}", font=font_xlarge, fill='white', anchor='mm')
-    
-    status = "Amount Due" if person.current_balance > 0 else "Clear"
-    draw.text((width//2, y_pos + 180), status, font=font_normal, fill='white', anchor='mm')
+    balance_table = Table(balance_data, colWidths=[2*inch, 3*inch])
+    balance_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#667eea')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ]))
+    story.append(balance_table)
+    story.append(Spacer(1, 0.3*inch))
     
     # Footer
-    draw.text((width//2, 710), "Thank you for your business!", font=font_small, fill='#666', anchor='mm')
-    draw.text((width//2, 740), "Stock Management System", font=font_small, fill='#999', anchor='mm')
+    story.append(Paragraph("شکریہ آپ کے کاروبار کے لیے!", normal_style))
+    story.append(Paragraph("Stock Management System", styles['Normal']))
     
-    # Convert to bytes
-    img_io = BytesIO()
-    img.save(img_io, 'PNG', quality=95)
-    img_io.seek(0)
-    return img_io.getvalue()
+    doc.build(story)
+    pdf_io.seek(0)
+    return pdf_io.getvalue()
 
 
-def save_temp_image(image_bytes, prefix='receipt'):
+def create_khata_statement_image(person, person_type):
     """
-    Save image bytes to temporary file.
+    DEPRECATED: Use create_khata_statement_pdf instead.
+    Kept for backwards compatibility.
+    """
+    return create_khata_statement_pdf(person, person_type)
+
+
+def save_temp_image(image_bytes, prefix='receipt', is_pdf=True):
+    """
+    Save image/PDF bytes to temporary file.
     
     Args:
-        image_bytes: Image data as bytes
+        image_bytes: Image/PDF data as bytes
         prefix: Filename prefix
+        is_pdf: If True, saves as PDF; otherwise as PNG
     
     Returns:
         str: Path to temporary file
     """
+    suffix = '.pdf' if is_pdf else '.png'
     temp_file = tempfile.NamedTemporaryFile(
         delete=False,
-        suffix='.png',
+        suffix=suffix,
         prefix=f'{prefix}_'
     )
     temp_file.write(image_bytes)
