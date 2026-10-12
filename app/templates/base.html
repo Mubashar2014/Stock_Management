@@ -723,11 +723,17 @@
                 <span class="nav-page-title">{% block page_title %}ڈیش بورڈ{% endblock %}</span>
             </div>
             <div class="dropdown">
-                <button class="user-pill dropdown-toggle border-0"
-                        data-bs-toggle="dropdown" aria-expanded="false">
-                    <span class="user-avatar">{{ current_user.username[0] | upper }}</span>
-                    <span class="d-none d-sm-inline">{{ current_user.username }}</span>
-                </button>
+                {% if current_user.is_authenticated %}
+<button class="user-pill dropdown-toggle border-0"
+        data-bs-toggle="dropdown" aria-expanded="false">
+    <span class="user-avatar">{{ current_user.username[0] | upper }}</span>
+    <span class="d-none d-sm-inline">{{ current_user.username }}</span>
+</button>
+{% else %}
+<a class="user-pill border-0 text-decoration-none" href="{{ url_for('auth.login') }}">
+    <span class="d-none d-sm-inline">لاگ ان</span>
+</a>
+{% endif %}
                 <ul class="dropdown-menu dropdown-menu-start shadow-sm" style="font-family: var(--font); min-width: 160px;">
                     <li>
                         <a class="dropdown-item text-danger d-flex align-items-center gap-2"

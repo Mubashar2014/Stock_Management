@@ -2,6 +2,7 @@ from flask import Flask, redirect, url_for, render_template, jsonify
 from app.config import Config
 from app.db import db, migrate
 from flask_login import LoginManager, current_user
+from sqlalchemy import text
 import logging
 
 login_manager = LoginManager()
@@ -49,7 +50,7 @@ def create_app():
     def before_request():
         """Ensure database connection is available"""
         try:
-            db.session.execute('SELECT 1')
+            db.session.execute(text('SELECT 1'))
         except Exception as e:
             logger.error(f'Database connection error: {str(e)}')
             db.session.rollback()
