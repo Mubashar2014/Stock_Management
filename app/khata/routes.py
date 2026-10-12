@@ -234,10 +234,38 @@ def khata_detail(person_type, person_id):
 
 # ── NEW: Khata Statement Image Routes ─────────────────────────────────
 
+def calculate_closing_balance(person_type, person_id):
+    """Calculate the true closing balance dynamically from transactions."""
+    opening_balance = Decimal('0')
+    
+    if person_type == 'supplier':
+        person = Supplier.query.get(person_id)
+        opening_balance = Decimal(str(person.opening_balance or 0))
+        
+        stock_transactions = StockIn.query.filter_by(supplier_id=person_id).all()
+        payments = Cashbook.query.filter_by(reference_type='supplier', reference_id=person_id).all()
+    else:
+        person = Customer.query.get(person_id)
+        opening_balance = Decimal(str(person.opening_balance or 0))
+        
+        stock_transactions = StockOut.query.filter_by(customer_id=person_id).all()
+        payments = Cashbook.query.filter_by(reference_type='customer', reference_id=person_id).all()
+    
+    # Calculate total debits (money owed)
+    total_debits = sum(Decimal(str(tx.total_amount)) for tx in stock_transactions)
+    
+    # Calculate total credits (payments received)
+    total_credits = sum(Decimal(str(p.amount)) for p in payments)
+    
+    # Closing balance = Opening + Debits - Credits
+    closing_balance = opening_balance + total_debits - total_credits
+    return closing_balance
+
+
 @khata_bp.route('/<string:person_type>/<int:person_id>/statement-image')
 @login_required
 def download_statement_image(person_type, person_id):
-    """Generate and download Khata statement as PNG image."""
+    """Generate and download Khata statement as PDF with dynamic balance."""
     
     # Validate person_type
     if person_type not in ('supplier', 'customer'):
@@ -249,18 +277,21 @@ def download_statement_image(person_type, person_id):
     else:
         person = Customer.query.get_or_404(person_id)
     
-    # Create image using PIL
-    image_bytes = create_khata_statement_image(person, person_type)
+    # Calculate closing balance dynamically
+    closing_balance = calculate_closing_balance(person_type, person_id)
+    
+    # Create PDF using ReportLab
+    pdf_bytes = create_khata_statement_image(person, person_type)
     
     # Save to temp file
-    temp_path = save_temp_image(image_bytes, prefix=f'khata_{person_type}_{person_id}')
+    temp_path = save_temp_image(pdf_bytes, prefix=f'khata_{person_type}_{person_id}', is_pdf=True)
     
     # Send file and clean up
     response = send_file(
         temp_path,
-        mimetype='image/png',
+        mimetype='application/pdf',
         as_attachment=True,
-        download_name=f'khata_statement_{person.name}_{person_id}.png'
+        download_name=f'khata_statement_{person.name}_{person_id}.pdf'
     )
     
     # Schedule cleanup after sending
@@ -290,11 +321,14 @@ def share_statement_whatsapp(person_type, person_id):
     else:
         person = Customer.query.get_or_404(person_id)
     
+    # Calculate closing balance dynamically
+    closing_balance = calculate_closing_balance(person_type, person_id)
+    
     # Create message
     person_label = 'سپلائر' if person_type == 'supplier' else 'گاہک'
     message = f"""کھاتا سٹیٹمنٹ
 {person_label}: {person.name}
-موجودہ باقیہ رقم: {"{:,.0f}".format(person.current_balance)} روپے
+موجودہ باقیہ رقم: {"{:,.0f}".format(closing_balance)} روپے
 تاریخ: {datetime.now().strftime('%d-%m-%Y')}"""
     
     # Get phone number
@@ -303,11 +337,11 @@ def share_statement_whatsapp(person_type, person_id):
     # Create WhatsApp links (Desktop primary, Web fallback)
     wa_data = get_whatsapp_desktop_link(phone, message)
     
-    # Generate image
-    image_bytes = create_khata_statement_image(person, person_type)
+    # Generate PDF
+    pdf_bytes = create_khata_statement_image(person, person_type)
     
-    # Save temporary image
-    temp_path = save_temp_image(image_bytes, prefix=f'khata_{person_type}_{person_id}')
+    # Save temporary file
+    temp_path = save_temp_image(pdf_bytes, prefix=f'khata_{person_type}_{person_id}', is_pdf=True)
     
     # Create a temporary URL for download
     image_download_url = f"{request.host_url}khata/{person_type}/{person_id}/statement-image"
@@ -317,5 +351,5 @@ def share_statement_whatsapp(person_type, person_id):
         wa_link=wa_data['desktop_url'],
         wa_web_link=wa_data['web_url'],
         image_url=image_download_url,
-        filename=f'khata_statement_{person.name}_{person_id}.png'
+        filename=f'khata_statement_{person.name}_{person_id}.pdf'
     )

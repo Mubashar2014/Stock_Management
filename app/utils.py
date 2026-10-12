@@ -14,6 +14,7 @@ from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import arabic_reshaper
+from app.models import StockIn, StockOut, Cashbook
 
 
 def register_urdu_font():
@@ -208,6 +209,7 @@ def create_receipt_image(entry, entry_type='stock_in'):
 def create_khata_statement_pdf(person, person_type):
     """
     Create Khata statement PDF using ReportLab with Urdu support.
+    Calculates balance dynamically from transactions.
     
     Args:
         person: Supplier or Customer object
@@ -216,6 +218,23 @@ def create_khata_statement_pdf(person, person_type):
     Returns:
         bytes: PDF data
     """
+    from decimal import Decimal
+    
+    # Calculate closing balance dynamically
+    opening_balance = Decimal(str(person.opening_balance or 0))
+    
+    if person_type == 'supplier':
+        stock_transactions = StockIn.query.filter_by(supplier_id=person.id).all()
+        payments = Cashbook.query.filter_by(reference_type='supplier', reference_id=person.id).all()
+    else:
+        stock_transactions = StockOut.query.filter_by(customer_id=person.id).all()
+        payments = Cashbook.query.filter_by(reference_type='customer', reference_id=person.id).all()
+    
+    # Calculate totals
+    total_debits = sum(Decimal(str(tx.total_amount)) for tx in stock_transactions) if stock_transactions else Decimal('0')
+    total_credits = sum(Decimal(str(p.amount)) for p in payments) if payments else Decimal('0')
+    closing_balance = opening_balance + total_debits - total_credits
+    
     urdu_font = register_urdu_font()
     
     pdf_io = BytesIO()
@@ -273,18 +292,37 @@ def create_khata_statement_pdf(person, person_type):
     story.append(person_table)
     story.append(Spacer(1, 0.3*inch))
     
-    # Balance display
-    balance_status = "روپے واجب الادا" if person.current_balance > 0 else "صاف ستھرا"
-    current_balance = Decimal(str(person.current_balance))
-    
+    # Balance summary
     balance_data = [
-        [Paragraph("موجودہ بیلنس:", ParagraphStyle('Bold', parent=normal_style, fontSize=14, bold=True)), 
-         Paragraph(f"Rs. {current_balance:,.0f}", ParagraphStyle('Bold', parent=normal_style, fontSize=14, bold=True))],
-        [Paragraph("حالت:", normal_style), Paragraph(balance_status, normal_style)],
+        [Paragraph("ابتدائی بقایا:", normal_style), Paragraph(f"Rs. {opening_balance:,.0f}", normal_style)],
+        [Paragraph("کل واجب الادا:", normal_style), Paragraph(f"Rs. {total_debits:,.0f}", normal_style)],
+        [Paragraph("کل ادائیگی:", normal_style), Paragraph(f"Rs. {total_credits:,.0f}", normal_style)],
     ]
     
     balance_table = Table(balance_data, colWidths=[2*inch, 3*inch])
     balance_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -2), colors.HexColor('#e9ecef')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ]))
+    story.append(balance_table)
+    story.append(Spacer(1, 0.2*inch))
+    
+    # Closing balance display (DYNAMIC)
+    balance_status = "روپے واجب الادا" if closing_balance > 0 else "صاف ستھرا"
+    
+    closing_data = [
+        [Paragraph("موجودہ بیلنس:", ParagraphStyle('Bold', parent=normal_style, fontSize=14, bold=True)), 
+         Paragraph(f"Rs. {closing_balance:,.0f}", ParagraphStyle('Bold', parent=normal_style, fontSize=14, bold=True))],
+        [Paragraph("حالت:", normal_style), Paragraph(balance_status, normal_style)],
+    ]
+    
+    closing_table = Table(closing_data, colWidths=[2*inch, 3*inch])
+    closing_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#667eea')),
         ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -293,7 +331,7 @@ def create_khata_statement_pdf(person, person_type):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ('GRID', (0, 0), (-1, -1), 1, colors.grey),
     ]))
-    story.append(balance_table)
+    story.append(closing_table)
     story.append(Spacer(1, 0.3*inch))
     
     # Footer
