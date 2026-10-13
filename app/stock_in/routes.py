@@ -1,12 +1,11 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, current_app
 from flask_login import login_required
 from app.models import StockIn, Supplier, Material, Cashbook
 from app.db import db
-from app.utils import create_receipt_image, save_temp_image
+from app.utils import create_receipt_image, get_whatsapp_desktop_link, image_to_base64
 from datetime import datetime
 from decimal import Decimal
-import urllib.parse
-import os
+from io import BytesIO
 
 stock_in_bp = Blueprint('stock_in', __name__)
 
@@ -134,7 +133,8 @@ def edit_stock_in(entry_id):
 
         try:
             old_paid_amount = entry.paid_amount
-            
+            old_date = entry.date
+
             # Step A: Reverse old balance effect - CRITICAL
             old_supplier = Supplier.query.get(old_supplier_id)
             if old_supplier:
@@ -150,7 +150,8 @@ def edit_stock_in(entry_id):
             entry.other_expenses_details = other_expenses_details
             entry.paid_amount = paid_amount
             entry.remaining = new_remaining
-            entry.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            transaction_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else old_date
+            entry.date = transaction_date
             entry.notes = notes
 
             # Step C: Apply new balance effect to supplier
@@ -159,14 +160,14 @@ def edit_stock_in(entry_id):
                 new_supplier.current_balance = Decimal(str(new_supplier.current_balance or 0)) + Decimal(str(new_remaining))
 
             # Step D: Update Cashbook entries for payment changes
-            # Delete old cashbook entry if it exists
+            # Delete old cashbook entry if it exists (match the OLD date, before it was overwritten)
             if old_paid_amount > 0:
                 old_cashbook = Cashbook.query.filter_by(
                     reference_type='supplier',
                     reference_id=old_supplier_id,
                     type='debit',
                     amount=old_paid_amount,
-                    date=entry.date
+                    date=old_date
                 ).first()
                 if old_cashbook:
                     db.session.delete(old_cashbook)
@@ -181,7 +182,7 @@ def edit_stock_in(entry_id):
                     reference_type='supplier',
                     reference_id=supplier_id,
                     description=f'خریداری کی ادائیگی - {material_name} ({quantity} {material.unit if material else ""})',
-                    date=datetime.strptime(date_str, '%Y-%m-%d').date()
+                    date=transaction_date
                 )
                 db.session.add(cashbook_entry)
 
@@ -245,32 +246,17 @@ def view_receipt(entry_id):
 @stock_in_bp.route('/receipt/<int:entry_id>/image')
 @login_required
 def download_receipt_image(entry_id):
-    """Generate and download receipt as PDF."""
+    """Generate and download the receipt as a PNG image."""
     entry = StockIn.query.get_or_404(entry_id)
-    
-    # Create PDF using ReportLab
-    pdf_bytes = create_receipt_image(entry, entry_type='stock_in')
-    
-    # Save to temp file
-    temp_path = save_temp_image(pdf_bytes, prefix=f'stock_in_receipt_{entry.id}', is_pdf=True)
-    
-    # Send file and clean up
-    response = send_file(
-        temp_path,
-        mimetype='application/pdf',
+
+    png_bytes = create_receipt_image(entry, entry_type='stock_in')
+
+    return send_file(
+        BytesIO(png_bytes),
+        mimetype='image/png',
         as_attachment=True,
-        download_name=f'receipt_stock_in_{entry.id}.pdf'
+        download_name=f'receipt_stock_in_{entry.id}.png'
     )
-    
-    # Schedule cleanup after sending
-    @response.call_on_close
-    def cleanup():
-        try:
-            os.unlink(temp_path)
-        except:
-            pass
-    
-    return response
 
 
 # 7. WHATSAPP SHARE (Image-based with Desktop + Web fallback)
@@ -278,40 +264,41 @@ def download_receipt_image(entry_id):
 @login_required
 def share_whatsapp(entry_id):
     """Share receipt image via WhatsApp Desktop or Web."""
-    from app.utils import get_whatsapp_desktop_link
-    
     entry = StockIn.query.get_or_404(entry_id)
-    
+
     # Create message
     material_name = entry.material.name if entry.material else 'مٹیریل'
+    supplier_name = entry.supplier.name if entry.supplier else ''
     message = f"""رسید - خریداری #{entry.id}
-{entry.supplier.name}
+{supplier_name}
 مٹیریل: {material_name}
 مقدار: {entry.quantity} {entry.material.unit if entry.material else ''}
 شرح: {"{:,.0f}".format(entry.rate)} روپے
 کل رقم: {"{:,.0f}".format(entry.total_amount)} روپے
 باقی رقم: {"{:,.0f}".format(entry.remaining)} روپے"""
-    
+
     # Get phone number
     phone = entry.supplier.phone if entry.supplier else ''
-    
+
     # Create WhatsApp links (Desktop primary, Web fallback)
     wa_data = get_whatsapp_desktop_link(phone, message)
-    
-    # Generate PNG image for sharing
-    image_bytes = create_receipt_image(entry, entry_type='stock_in')
-    
-    # Save temporary image as PNG
-    temp_path = save_temp_image(image_bytes, prefix=f'stock_in_receipt_{entry.id}', is_pdf=False)
-    
-    # Create a temporary URL for download - points to the PDF download route
-    image_download_url = f"{request.host_url}stock-in/receipt/{entry_id}/image"
-    
+
+    # Embed the receipt image directly so the browser can preview AND
+    # download it as a real PNG (the download route forces an attachment
+    # disposition, which breaks <img> previews).
+    image_data_url = ''
+    try:
+        image_bytes = create_receipt_image(entry, entry_type='stock_in')
+        image_data_url = 'data:image/png;base64,' + image_to_base64(image_bytes)
+    except Exception as e:
+        current_app.logger.error(f'Failed to generate receipt image for stock-in {entry_id}: {e}')
+
     return render_template(
         'whatsapp_share.html',
+        person_name=supplier_name,
         wa_link=wa_data['desktop_url'],
         wa_web_link=wa_data['web_url'],
-        image_url=image_download_url,
+        image_data_url=image_data_url,
         filename=f'receipt_stock_in_{entry.id}.png'
     )
-    )
+

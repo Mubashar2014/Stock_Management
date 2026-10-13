@@ -521,28 +521,7 @@ def create_khata_statement_image(person, person_type):
     return img_io.getvalue()
 
 
-# ---------- PNG versions (same layout, rendered from the PDF) ----------
-
-def pdf_to_png_bytes(pdf_bytes, dpi=150):
-    """Render the first page of a PDF to PNG bytes. Needs: pip install pymupdf"""
-    import fitz  # PyMuPDF
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    try:
-        pix = doc[0].get_pixmap(dpi=dpi)
-        return pix.tobytes("png")
-    finally:
-        doc.close()
-
-
-def create_receipt_png(entry, entry_type='stock_in'):
-    """Receipt as PNG bytes (for WhatsApp sharing)."""
-    return pdf_to_png_bytes(create_receipt_pdf(entry, entry_type))
-
-
-def create_khata_statement_png(person, person_type):
-    """Khata statement as PNG bytes (for WhatsApp sharing)."""
-    return pdf_to_png_bytes(create_khata_statement_pdf(person, person_type))
-
+# ---------- Temporary file helper ----------
 
 def save_temp_image(image_bytes, prefix='receipt', is_pdf=True):
     """
@@ -569,17 +548,34 @@ def image_to_base64(image_bytes):
 
 
 def _clean_phone(phone, default_cc='92'):
-    """03113335055 / +92 311 3335055 -> 923113335055. '' if missing."""
-    digits = re.sub(r'\D', '', phone or '')
+    """Normalize a phone number to digits-only international format.
+
+    Handles: '03113335055' (local), '+92 311 3335055', '0092...',
+    '92311...' and bare national numbers like '311...'.
+    Returns '' if missing.
+    """
+    raw = (phone or '').strip()
+    if not raw:
+        return ''
+
+    # Explicit international prefix: keep the digits as-is (they already
+    # include the country code).
+    if raw.startswith('+') or raw.startswith('00'):
+        digits = re.sub(r'\D', '', raw)
+        if digits.startswith('00'):
+            digits = digits[2:]
+        return digits
+
+    digits = re.sub(r'\D', '', raw)
     if not digits:
         return ''
-    if digits.startswith('00'):
-        digits = digits[2:]
-    elif digits.startswith('0'):
-        digits = default_cc + digits[1:]
-    elif not digits.startswith(default_cc):
-        digits = default_cc + digits
-    return digits
+    if digits.startswith('0'):
+        # Local format, e.g. 03113335055 -> 923113335055
+        return default_cc + digits[1:]
+    if digits.startswith(default_cc):
+        return digits
+    # Bare national number without leading zero, e.g. 3113335055
+    return default_cc + digits
 
 
 def send_whatsapp_image_browser(phone, message_text):

@@ -1,13 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, send_file, url_for
+from flask import Blueprint, render_template, request, redirect, send_file, url_for, current_app
 from flask_login import login_required
 from app.models import Supplier, Customer, StockIn, StockOut, Cashbook
-from app.db import db
-from app.utils import create_khata_statement_image, save_temp_image
-from sqlalchemy import func
+from app.utils import create_khata_statement_image, get_whatsapp_desktop_link, image_to_base64
 from decimal import Decimal
 from datetime import datetime, date
-import urllib.parse
-import os
+from io import BytesIO
 
 khata_bp = Blueprint('khata', __name__)
 
@@ -265,91 +262,74 @@ def calculate_closing_balance(person_type, person_id):
 @khata_bp.route('/<string:person_type>/<int:person_id>/statement-image')
 @login_required
 def download_statement_image(person_type, person_id):
-    """Generate and download Khata statement as PDF with dynamic balance."""
-    
+    """Generate and download the Khata statement as a PNG image."""
+
     # Validate person_type
     if person_type not in ('supplier', 'customer'):
         return redirect(url_for('khata.index'))
-    
+
     # Load the person
     if person_type == 'supplier':
         person = Supplier.query.get_or_404(person_id)
     else:
         person = Customer.query.get_or_404(person_id)
-    
-    # Calculate closing balance dynamically
-    closing_balance = calculate_closing_balance(person_type, person_id)
-    
-    # Create PDF using ReportLab
-    pdf_bytes = create_khata_statement_image(person, person_type)
-    
-    # Save to temp file
-    temp_path = save_temp_image(pdf_bytes, prefix=f'khata_{person_type}_{person_id}', is_pdf=True)
-    
-    # Send file and clean up
-    response = send_file(
-        temp_path,
-        mimetype='application/pdf',
+
+    png_bytes = create_khata_statement_image(person, person_type)
+
+    return send_file(
+        BytesIO(png_bytes),
+        mimetype='image/png',
         as_attachment=True,
-        download_name=f'khata_statement_{person.name}_{person_id}.pdf'
+        download_name=f'khata_statement_{person.name}_{person_id}.png'
     )
-    
-    # Schedule cleanup after sending
-    @response.call_on_close
-    def cleanup():
-        try:
-            os.unlink(temp_path)
-        except:
-            pass
-    
-    return response
 
 
 @khata_bp.route('/<string:person_type>/<int:person_id>/whatsapp')
 @login_required
 def share_statement_whatsapp(person_type, person_id):
     """Share khata statement via WhatsApp Desktop or Web."""
-    from app.utils import get_whatsapp_desktop_link
-    
+
     # Validate person_type
     if person_type not in ('supplier', 'customer'):
         return redirect(url_for('khata.index'))
-    
+
     # Load the person
     if person_type == 'supplier':
         person = Supplier.query.get_or_404(person_id)
     else:
         person = Customer.query.get_or_404(person_id)
-    
+
     # Calculate closing balance dynamically
     closing_balance = calculate_closing_balance(person_type, person_id)
-    
+
     # Create message
     person_label = 'سپلائر' if person_type == 'supplier' else 'گاہک'
     message = f"""کھاتا سٹیٹمنٹ
 {person_label}: {person.name}
 موجودہ باقیہ رقم: {"{:,.0f}".format(closing_balance)} روپے
 تاریخ: {datetime.now().strftime('%d-%m-%Y')}"""
-    
+
     # Get phone number
     phone = person.phone if person else ''
-    
+
     # Create WhatsApp links (Desktop primary, Web fallback)
     wa_data = get_whatsapp_desktop_link(phone, message)
-    
-    # Generate PNG image for sharing
-    image_bytes = create_khata_statement_image(person, person_type)
-    
-    # Save temporary file as PNG
-    temp_path = save_temp_image(image_bytes, prefix=f'khata_{person_type}_{person_id}', is_pdf=False)
-    
-    # Create a temporary URL for download - points to the PDF download route
-    image_download_url = f"{request.host_url}khata/{person_type}/{person_id}/statement-image"
-    
+
+    # Embed the statement image directly so the browser can preview AND
+    # download it as a real PNG (the download route forces an attachment
+    # disposition, which breaks <img> previews).
+    image_data_url = ''
+    try:
+        image_bytes = create_khata_statement_image(person, person_type)
+        image_data_url = 'data:image/png;base64,' + image_to_base64(image_bytes)
+    except Exception as e:
+        current_app.logger.error(f'Failed to generate khata statement image for {person_type} {person_id}: {e}')
+
     return render_template(
         'whatsapp_share.html',
+        person_name=person.name,
         wa_link=wa_data['desktop_url'],
         wa_web_link=wa_data['web_url'],
-        image_url=image_download_url,
+        image_data_url=image_data_url,
         filename=f'khata_statement_{person.name}_{person_id}.png'
     )

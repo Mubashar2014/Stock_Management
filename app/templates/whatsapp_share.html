@@ -54,8 +54,8 @@
         <h1>واٹس ایپ پر شیئر کریں</h1>
         {% if person_name %}<div class="person">{{ person_name }}</div>{% endif %}
 
-        {% if image_url %}
-        <img class="preview" src="{{ image_url }}" alt="receipt">
+        {% if image_data_url %}
+        <img class="preview" src="{{ image_data_url }}" alt="receipt">
         {% endif %}
 
         <div class="status {% if not wa_web_link %}error{% endif %}" id="status">
@@ -78,7 +78,7 @@
     </div>
 
     <script>
-        const imageUrl    = {{ (image_url or '') | tojson }};
+        const imageUrl    = {{ (image_data_url or '') | tojson }};
         const filename    = {{ (filename or 'receipt.png') | tojson }};
         const desktopLink = {{ (wa_link or '') | tojson }};
         const webLink     = {{ (wa_web_link or '') | tojson }};
