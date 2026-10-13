@@ -5,226 +5,137 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>واٹس ایپ پر شیئر کریں</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            min-height: 100vh; display: flex; align-items: center;
+            justify-content: center; padding: 20px;
         }
         .container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 500px;
-            width: 100%;
-            padding: 40px;
-            text-align: center;
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.3);
+            max-width: 500px; width: 100%; padding: 32px; text-align: center;
         }
-        .spinner {
-            width: 60px;
-            height: 60px;
-            margin: 0 auto 20px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        h1 {
-            color: #333;
-            font-size: 24px;
-            margin-bottom: 10px;
-        }
-        p {
-            color: #666;
-            font-size: 16px;
-            line-height: 1.6;
-            margin-bottom: 20px;
+        h1 { color: #333; font-size: 24px; margin-bottom: 6px; }
+        .person { color: #667eea; font-weight: 600; margin-bottom: 16px; }
+        .preview {
+            max-width: 100%; max-height: 360px; border: 1px solid #ddd;
+            border-radius: 8px; margin-bottom: 16px;
         }
         .status {
-            margin-top: 30px;
-            padding: 15px;
-            background: #f0f8ff;
-            border-left: 4px solid #667eea;
-            border-radius: 4px;
-            text-align: right;
+            padding: 14px; background: #f0f8ff; border-right: 4px solid #667eea;
+            border-radius: 4px; text-align: right; color: #667eea;
+            font-size: 14px; font-weight: 600;
         }
-        .status-text {
-            color: #667eea;
-            font-size: 14px;
-            font-weight: 600;
-        }
+        .status.error { background: #fff0f0; border-color: #d33; color: #d33; }
+        .status.ok { background: #f0fff4; border-color: #25d366; color: #1a9a4a; }
         .info-box {
-            background: #fffbf0;
-            border: 1px solid #ffd700;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 20px;
-            text-align: right;
+            background: #fffbf0; border: 1px solid #ffd700; border-radius: 8px;
+            padding: 14px; margin-top: 16px; text-align: right;
+            font-size: 14px; color: #666; line-height: 1.9;
         }
-        .info-box strong {
-            color: #ff8c00;
-            display: block;
-            margin-bottom: 8px;
-        }
-        .info-box p {
-            color: #666;
-            font-size: 14px;
-            margin: 5px 0;
-        }
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 30px;
-            flex-wrap: wrap-reverse;
-        }
+        .button-group { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap-reverse; }
         .btn {
-            flex: 1;
-            min-width: 120px;
-            padding: 12px 20px;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
+            flex: 1; min-width: 120px; padding: 12px 20px; border: none;
+            border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer;
+            text-decoration: none; display: inline-flex; align-items: center;
+            justify-content: center; gap: 8px; transition: all .3s;
         }
-        .btn-whatsapp {
-            background: #25d366;
-            color: white;
-            flex: 2;
-        }
-        .btn-whatsapp:hover {
-            background: #20ba5a;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(37, 211, 102, 0.3);
-        }
-        .btn-download {
-            background: #667eea;
-            color: white;
-        }
-        .btn-download:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-        }
-        .btn-back {
-            background: #e0e0e0;
-            color: #333;
-        }
-        .btn-back:hover {
-            background: #d0d0d0;
-        }
-        .success-icon {
-            font-size: 48px;
-            margin-bottom: 20px;
-        }
-        .step {
-            text-align: right;
-            margin: 15px 0;
-            padding: 10px;
-            background: #f9f9f9;
-            border-radius: 6px;
-        }
-        .step-number {
-            display: inline-block;
-            width: 30px;
-            height: 30px;
-            background: #667eea;
-            color: white;
-            border-radius: 50%;
-            line-height: 30px;
-            margin-left: 10px;
-            font-weight: bold;
-        }
+        .btn-whatsapp { background: #25d366; color: #fff; flex: 2; }
+        .btn-whatsapp:hover { background: #20ba5a; }
+        .btn-whatsapp:disabled { background: #aaa; cursor: not-allowed; }
+        .btn-back { background: #e0e0e0; color: #333; }
+        .btn-back:hover { background: #d0d0d0; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="spinner" id="spinner"></div>
-        <h1 id="title">واٹس ایپ پر شیئر کریں</h1>
-        <p id="subtitle">براہ کرم انتظار کریں...</p>
-        
-        <div class="status">
-            <div class="status-text" id="status">تصویر تیار ہو رہی ہے...</div>
+        <h1>واٹس ایپ پر شیئر کریں</h1>
+        {% if person_name %}<div class="person">{{ person_name }}</div>{% endif %}
+
+        {% if image_url %}
+        <img class="preview" src="{{ image_url }}" alt="receipt">
+        {% endif %}
+
+        <div class="status {% if not wa_web_link %}error{% endif %}" id="status">
+            {% if wa_web_link %}تصویر تیار ہے{% else %}❌ اس کا فون نمبر محفوظ نہیں ہے{% endif %}
         </div>
-        
+
         <div class="info-box">
-            <strong>⏱️ یہ عمل مکمل ہوگا:</strong>
-            <p id="steps">1. تصویر خودکار ڈاؤن لوڈ ہوگی</p>
-            <p>2. واٹس ایپ ڈیسک ٹاپ خودکار کھل جائے گا</p>
-            <p>3. تصویر منسلک کر کے براہ راست بھیجیں</p>
+            1. بٹن دبائیں، تصویر ڈاؤن لوڈ ہوگی<br>
+            2. اسی شخص کی واٹس ایپ چیٹ خودکار کھلے گی<br>
+            3. 📎 دبا کر تازہ ترین ڈاؤن لوڈ شدہ تصویر چنیں اور Send دبائیں
         </div>
-        
-        <div class="button-group" id="buttons" style="display: none;">
-            <a href="javascript:window.history.back()" class="btn btn-back">
-                ❌ واپس جائیں
-            </a>
-            <a href="{{ wa_link }}" target="_blank" class="btn btn-whatsapp" id="waBtn">
-                💬 واٹس ایپ کھولیں
-            </a>
+
+        <div class="button-group">
+            <a href="javascript:window.history.back()" class="btn btn-back">❌ واپس جائیں</a>
+            <button type="button" class="btn btn-whatsapp" id="shareBtn"
+                    {% if not wa_web_link %}disabled{% endif %}>
+                💬 ڈاؤن لوڈ کریں اور چیٹ کھولیں
+            </button>
         </div>
     </div>
 
     <script>
-        // Simulate processing
-        setTimeout(function() {
-            document.getElementById('spinner').style.display = 'none';
-            document.getElementById('title').textContent = 'تیار ہے!';
-            document.getElementById('subtitle').textContent = 'آپ کی تصویر ڈاؤن لوڈ ہو رہی ہے اور واٹس ایپ کھولنے والا ہے...';
-            document.getElementById('status').textContent = '✅ تصویر تیار ہے - واٹس ایپ کھولنے والا ہے';
-            document.getElementById('buttons').style.display = 'flex';
-            
-            // Auto-download image if available
-            const imageUrl = "{{ image_url }}";
-            if (imageUrl) {
-                const link = document.createElement('a');
-                link.href = imageUrl;
-                link.download = "{{ filename }}";
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+        const imageUrl    = {{ (image_url or '') | tojson }};
+        const filename    = {{ (filename or 'receipt.png') | tojson }};
+        const desktopLink = {{ (wa_link or '') | tojson }};
+        const webLink     = {{ (wa_web_link or '') | tojson }};
+        const statusEl    = document.getElementById('status');
+        const btn         = document.getElementById('shareBtn');
+        const isMobile    = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+        function setStatus(text, type) {
+            statusEl.textContent = text;
+            statusEl.className = 'status' + (type ? ' ' + type : '');
+        }
+
+        function downloadImage() {
+            const a = document.createElement('a');
+            a.href = imageUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function openChat() {
+            if (!isMobile && desktopLink.startsWith('whatsapp://')) {
+                // Desktop: try the WhatsApp app, fall back to WhatsApp Web
+                let appOpened = false;
+                const onBlur = () => { appOpened = true; };
+                window.addEventListener('blur', onBlur, { once: true });
+                window.location.href = desktopLink;
+                setTimeout(() => {
+                    window.removeEventListener('blur', onBlur);
+                    if (!appOpened) window.open(webLink, '_blank');
+                }, 2000);
+            } else {
+                // Mobile: wa.me opens the WhatsApp app directly
+                window.location.href = webLink;
             }
-            
-            // Auto-open WhatsApp Desktop after a short delay
-            // Desktop URL scheme: whatsapp://send?phone=...
-            // If WhatsApp Desktop is not installed, it will fail silently and user can use Web
-            setTimeout(function() {
-                const desktopLink = "{{ wa_link }}";
-                const webLink = "{{ wa_web_link | default('') }}";
-                
-                // Try to open Desktop first
-                if (desktopLink && desktopLink.startsWith('whatsapp://')) {
-                    window.location.href = desktopLink;
-                    
-                    // Fallback to Web if Desktop doesn't open in 2 seconds
-                    setTimeout(function() {
-                        if (webLink) {
-                            window.open(webLink, '_blank');
-                        }
-                    }, 2000);
-                } else if (webLink) {
-                    // If no Desktop link, use Web directly
-                    window.open(webLink, '_blank');
+        }
+
+        btn.addEventListener('click', function () {
+            if (!webLink) {
+                setStatus('❌ اس کا فون نمبر محفوظ نہیں ہے', 'error');
+                return;
+            }
+            btn.disabled = true;
+
+            if (imageUrl) {
+                try {
+                    downloadImage();
+                    setStatus('✅ تصویر ڈاؤن لوڈ ہو گئی، چیٹ کھل رہی ہے...', 'ok');
+                } catch (e) {
+                    setStatus('⚠️ ڈاؤن لوڈ نہیں ہو سکی، تصویر پر لانگ پریس/رائٹ کلک کر کے محفوظ کریں', 'error');
                 }
-            }, 500);
-        }, 1000);
+            }
+
+            // Short delay so the download starts before the page navigates away
+            setTimeout(() => { openChat(); btn.disabled = false; }, 1200);
+        });
     </script>
 </body>
 </html>

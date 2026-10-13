@@ -298,13 +298,13 @@ def share_whatsapp(entry_id):
     # Create WhatsApp links (Desktop primary, Web fallback)
     wa_data = get_whatsapp_desktop_link(phone, message)
     
-    # Generate image
+    # Generate PNG image for sharing
     image_bytes = create_receipt_image(entry, entry_type='stock_in')
     
-    # Save temporary image
-    temp_path = save_temp_image(image_bytes, prefix=f'stock_in_receipt_{entry.id}')
+    # Save temporary image as PNG
+    temp_path = save_temp_image(image_bytes, prefix=f'stock_in_receipt_{entry.id}', is_pdf=False)
     
-    # Create a temporary URL for download
+    # Create a temporary URL for download - points to the PDF download route
     image_download_url = f"{request.host_url}stock-in/receipt/{entry_id}/image"
     
     return render_template(
@@ -313,4 +313,5 @@ def share_whatsapp(entry_id):
         wa_web_link=wa_data['web_url'],
         image_url=image_download_url,
         filename=f'receipt_stock_in_{entry.id}.png'
+    )
     )

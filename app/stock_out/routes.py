@@ -303,7 +303,7 @@ def download_receipt_image(entry_id):
 @login_required
 def share_whatsapp(entry_id):
     """Share receipt image via WhatsApp Web."""
-    from app.utils import send_whatsapp_image_browser
+    from app.utils import send_whatsapp_image_browser, get_whatsapp_desktop_link
     
     entry = StockOut.query.get_or_404(entry_id)
     
@@ -320,22 +320,22 @@ def share_whatsapp(entry_id):
     # Get phone number
     phone = entry.customer.phone if entry.customer else ''
     
-    # Create WhatsApp link
-    wa_data = send_whatsapp_image_browser(phone, message)
+    # Create WhatsApp links using the proper helper
+    wa_data = get_whatsapp_desktop_link(phone, message)
     
-    # Generate image
+    # Generate PNG image for sharing
     image_bytes = create_receipt_image(entry, entry_type='stock_out')
     
-    # Save temporary image
-    temp_path = save_temp_image(image_bytes, prefix=f'stock_out_receipt_{entry.id}')
+    # Save temporary image as PNG
+    temp_path = save_temp_image(image_bytes, prefix=f'stock_out_receipt_{entry.id}', is_pdf=False)
     
-    # Create a temporary URL for download
-    from flask import url_for as flask_url_for
+    # Create a temporary URL for download - points to the PDF download route
     image_download_url = f"{request.host_url}stock-out/receipt/{entry_id}/image"
     
     return render_template(
         'whatsapp_share.html',
-        wa_link=wa_data['url'],
+        wa_link=wa_data['desktop_url'],
+        wa_web_link=wa_data['web_url'],
         image_url=image_download_url,
         filename=f'receipt_stock_out_{entry.id}.png'
     )

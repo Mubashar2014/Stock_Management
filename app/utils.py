@@ -1,209 +1,210 @@
 """Utility functions for the application."""
 import os
+import re
 import tempfile
 import base64
 import urllib.parse
 from io import BytesIO
 from datetime import datetime
 from decimal import Decimal
+from xml.sax.saxutils import escape
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import arabic_reshaper
+from bidi.algorithm import get_display
 from app.models import StockIn, StockOut, Cashbook
+from PIL import Image, ImageDraw, ImageFont
+
+# Bundle the font inside the project so it works on any server
+FONT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         'static', 'fonts', 'NotoNaskhArabic-Regular.ttf')
+
+_FONT_CACHE = {}
 
 
 def register_urdu_font():
-    """Register Urdu font for PDF generation."""
-    try:
-        # Try multiple font paths
-        font_paths = [
-            "/usr/share/fonts/truetype/noto/NotoSansUrdu-Regular.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        ]
-        
-        for font_path in font_paths:
-            if os.path.exists(font_path):
-                try:
-                    pdfmetrics.registerFont(TTFont('UrduFont', font_path))
-                    return 'UrduFont'
-                except:
-                    continue
-        
-        # Fallback to Helvetica if no font found
-        return 'Helvetica'
-    except:
-        return 'Helvetica'
+    """Register an Urdu-capable font. Returns the font name."""
+    if 'name' in _FONT_CACHE:
+        return _FONT_CACHE['name']
+
+    candidates = [
+        FONT_FILE,
+        "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoNastaliqUrdu-Regular.ttf",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            try:
+                pdfmetrics.registerFont(TTFont('UrduFont', path))
+                _FONT_CACHE['name'] = 'UrduFont'
+                return 'UrduFont'
+            except Exception:
+                continue
+
+    print(f"[WARNING] Urdu font not found. Place it at: {FONT_FILE}")
+    _FONT_CACHE['name'] = 'Helvetica'
+    return 'Helvetica'
+
+
+_LATIN_RUN = re.compile(r'[\x20-\x7E]+')
+
+
+def ur(text):
+    """
+    Shape + reorder Urdu text and return safe Paragraph markup.
+    English/digit runs are switched to Helvetica because the Urdu font
+    has no Latin letters.
+    """
+    text = '' if text is None else str(text)
+    shown = get_display(arabic_reshaper.reshape(text))
+
+    out, last = [], 0
+    for m in _LATIN_RUN.finditer(shown):
+        out.append(escape(shown[last:m.start()]))
+        out.append(f'<font name="Helvetica">{escape(m.group())}</font>')
+        last = m.end()
+    out.append(escape(shown[last:]))
+    return ''.join(out)
+
+
+def P(text, style):
+    """Paragraph with Urdu shaping applied."""
+    return Paragraph(ur(text), style)
+
+
+def _base_styles(urdu_font, title_size=20):
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle', parent=styles['Heading1'], fontSize=title_size,
+        textColor=colors.HexColor('#667eea'), spaceAfter=12, alignment=1,
+        fontName=urdu_font)
+    heading_style = ParagraphStyle(
+        'CustomHeading', parent=styles['Heading2'], fontSize=14,
+        textColor=colors.HexColor('#333333'), spaceAfter=8, alignment=1,
+        fontName=urdu_font)
+    normal_style = ParagraphStyle(
+        'CustomNormal', parent=styles['Normal'], fontSize=11,
+        fontName=urdu_font, spaceAfter=6, alignment=1)
+    return styles, title_style, heading_style, normal_style
+
+
+def _table_style(bg, align='CENTER', size=10, pad=8):
+    return TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(bg)),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), align),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTSIZE', (0, 0), (-1, -1), size),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), pad),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ])
 
 
 def create_receipt_pdf(entry, entry_type='stock_in'):
     """
     Create receipt PDF using ReportLab with Urdu support.
-    
+
     Args:
         entry: StockIn or StockOut entry
         entry_type: 'stock_in' or 'stock_out'
-    
+
     Returns:
         bytes: PDF data
     """
     urdu_font = register_urdu_font()
-    
+
     pdf_io = BytesIO()
-    doc = SimpleDocTemplate(pdf_io, pagesize=letter, rightMargin=0.5*inch, leftMargin=0.5*inch,
-                            topMargin=0.75*inch, bottomMargin=0.75*inch)
-    
-    styles = getSampleStyleSheet()
+    doc = SimpleDocTemplate(pdf_io, pagesize=letter, rightMargin=0.5*inch,
+                            leftMargin=0.5*inch, topMargin=0.75*inch,
+                            bottomMargin=0.75*inch)
+    styles, title_style, heading_style, normal_style = _base_styles(urdu_font)
     story = []
-    
-    # Custom styles
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=20,
-        textColor=colors.HexColor('#667eea'),
-        spaceAfter=12,
-        alignment=1
-    )
-    
-    heading_style = ParagraphStyle(
-        'CustomHeading',
-        parent=styles['Heading2'],
-        fontSize=14,
-        textColor=colors.HexColor('#333333'),
-        spaceAfter=8,
-        fontName=urdu_font
-    )
-    
-    normal_style = ParagraphStyle(
-        'CustomNormal',
-        parent=styles['Normal'],
-        fontSize=11,
-        fontName=urdu_font,
-        spaceAfter=6
-    )
-    
+
     # Header
-    title = "Sher Ali Building Material"
     receipt_type = "رسید - خریداری" if entry_type == 'stock_in' else "رسید - فروخت"
-    
-    story.append(Paragraph(title, title_style))
-    story.append(Paragraph(receipt_type, heading_style))
+    story.append(P("Sher Ali Building Material", title_style))
+    story.append(P(receipt_type, heading_style))
     story.append(Spacer(1, 0.2*inch))
-    
-    # Receipt info table
+
+    # Receipt info
     info_data = [
-        [Paragraph("رسید نمبر:", normal_style), Paragraph(f"#{entry.id}", normal_style)],
-        [Paragraph("تاریخ:", normal_style), Paragraph(entry.date.strftime('%d/%m/%Y'), normal_style)],
+        [P("رسید نمبر:", normal_style), P(f"#{entry.id}", normal_style)],
+        [P("تاریخ:", normal_style), P(entry.date.strftime('%d/%m/%Y'), normal_style)],
     ]
-    
     info_table = Table(info_data, colWidths=[2*inch, 2*inch])
-    info_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8f9fa')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-    ]))
+    info_table.setStyle(_table_style('#f8f9fa'))
     story.append(info_table)
     story.append(Spacer(1, 0.2*inch))
-    
+
     # Person info
     if entry_type == 'stock_in':
-        person = entry.supplier
-        person_label = "سپلائر:"
+        person, person_label = entry.supplier, "سپلائر:"
     else:
-        person = entry.customer
-        person_label = "گاہک:"
-    
+        person, person_label = entry.customer, "گاہک:"
+
     person_data = [
-        [Paragraph(person_label, normal_style), Paragraph(person.name, normal_style)],
-        [Paragraph("فون:", normal_style), Paragraph(person.phone or '-', normal_style)],
+        [P(person_label, normal_style), P(person.name, normal_style)],
+        [P("فون:", normal_style), P(person.phone or '-', normal_style)],
     ]
-    
     person_table = Table(person_data, colWidths=[2*inch, 2*inch])
-    person_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#e9ecef')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-    ]))
+    person_table.setStyle(_table_style('#e9ecef'))
     story.append(person_table)
     story.append(Spacer(1, 0.2*inch))
-    
+
     # Material details
     material_data = [
-        [Paragraph("مٹیریل:", normal_style), Paragraph(entry.material.name, normal_style)],
-        [Paragraph("مقدار:", normal_style), Paragraph(f"{entry.quantity} {entry.material.unit}", normal_style)],
-        [Paragraph("شرح:", normal_style), Paragraph(f"Rs. {entry.rate:,.0f}", normal_style)],
+        [P("مٹیریل:", normal_style), P(entry.material.name, normal_style)],
+        [P("مقدار:", normal_style), P(f"{entry.quantity} {entry.material.unit}", normal_style)],
+        [P("شرح:", normal_style), P(f"Rs. {entry.rate:,.0f}", normal_style)],
     ]
-    
     material_table = Table(material_data, colWidths=[2*inch, 2*inch])
-    material_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0f0f0')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-    ]))
+    material_table.setStyle(_table_style('#f0f0f0'))
     story.append(material_table)
     story.append(Spacer(1, 0.25*inch))
-    
+
     # Financial summary
     subtotal = Decimal(str(entry.quantity)) * Decimal(str(entry.rate))
-    
-    financial_data = [
-        [Paragraph("ذیلی کل:", normal_style), Paragraph(f"Rs. {subtotal:,.0f}", normal_style)],
-    ]
-    
+    financial_data = [[P("ذیلی کل:", normal_style), P(f"Rs. {subtotal:,.0f}", normal_style)]]
+
     if entry.other_expenses > 0:
-        financial_data.append([Paragraph("دیگر اخراجات:", normal_style), 
-                               Paragraph(f"Rs. {entry.other_expenses:,.0f}", normal_style)])
-    
+        financial_data.append([P("دیگر اخراجات:", normal_style),
+                               P(f"Rs. {entry.other_expenses:,.0f}", normal_style)])
     if hasattr(entry, 'discount') and entry.discount > 0:
-        financial_data.append([Paragraph("رعایت:", normal_style), 
-                               Paragraph(f"Rs. {entry.discount:,.0f}", normal_style)])
-    
-    financial_data.append([Paragraph("کل رقم:", normal_style), 
-                          Paragraph(f"Rs. {entry.total_amount:,.0f}", normal_style)])
-    financial_data.append([Paragraph("وصول شدہ:", normal_style), 
-                          Paragraph(f"Rs. {entry.paid_amount:,.0f}", normal_style)])
-    financial_data.append([Paragraph("باقی رقم:", normal_style), 
-                          Paragraph(f"Rs. {entry.remaining:,.0f}", normal_style)])
-    
+        financial_data.append([P("رعایت:", normal_style),
+                               P(f"Rs. {entry.discount:,.0f}", normal_style)])
+
+    # Last row (remaining) is white-on-blue, so it gets its own style
+    white_style = ParagraphStyle('WhiteBold', parent=normal_style,
+                                 fontSize=12, textColor=colors.white)
+
+    financial_data.append([P("کل رقم:", normal_style),
+                           P(f"Rs. {entry.total_amount:,.0f}", normal_style)])
+    financial_data.append([P("وصول شدہ:", normal_style),
+                           P(f"Rs. {entry.paid_amount:,.0f}", normal_style)])
+    financial_data.append([P("باقی رقم:", white_style),
+                           P(f"Rs. {entry.remaining:,.0f}", white_style)])
+
     financial_table = Table(financial_data, colWidths=[2.5*inch, 1.5*inch])
     financial_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e9ecef')),
-        ('BACKGROUND', (1, 0), (1, -3), colors.white),
+        ('BACKGROUND', (0, 0), (-1, -2), colors.HexColor('#e9ecef')),
         ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#667eea')),
-        ('TEXTCOLOR', (0, -1), (-1, -1), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('FONTSIZE', (0, -1), (-1, -1), 12),
-        ('BOLD', (0, -1), (-1, -1), True),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ('GRID', (0, 0), (-1, -1), 1, colors.grey),
     ]))
     story.append(financial_table)
     story.append(Spacer(1, 0.3*inch))
-    
+
     # Footer
-    story.append(Paragraph("شکریہ آپ کے کاروبار کے لیے!", normal_style))
-    story.append(Paragraph("Sher Ali Building Material - Stock Management System", styles['Normal']))
-    
+    story.append(P("شکریہ آپ کے کاروبار کے لیے!", normal_style))
+    story.append(P("Sher Ali Building Material - Stock Management System", normal_style))
+
     doc.build(story)
     pdf_io.seek(0)
     return pdf_io.getvalue()
@@ -211,144 +212,217 @@ def create_receipt_pdf(entry, entry_type='stock_in'):
 
 def create_receipt_image(entry, entry_type='stock_in'):
     """
-    DEPRECATED: Use create_receipt_pdf instead.
-    Kept for backwards compatibility.
+    Create receipt image (PNG) for sharing.
+    Uses PIL for quick PNG generation without complex font rendering.
+    
+    Args:
+        entry: StockIn or StockOut entry
+        entry_type: 'stock_in' or 'stock_out'
+    
+    Returns:
+        bytes: PNG image data
     """
-    return create_receipt_pdf(entry, entry_type)
+    width, height = 800, 1000
+    
+    if entry_type == 'stock_in':
+        gradient_start = (102, 126, 234)  # Purple
+        gradient_end = (118, 75, 162)
+    else:
+        gradient_start = (17, 153, 142)  # Teal
+        gradient_end = (56, 239, 125)  # Green
+    
+    img = Image.new('RGB', (width, height), 'white')
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
+        font_medium = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
+        font_normal = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
+        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+    except:
+        font_large = font_medium = font_normal = font_small = ImageFont.load_default()
+    
+    # Draw gradient header
+    for y in range(200):
+        ratio = y / 200
+        r = int(gradient_start[0] * (1 - ratio) + gradient_end[0] * ratio)
+        g = int(gradient_start[1] * (1 - ratio) + gradient_end[1] * ratio)
+        b = int(gradient_start[2] * (1 - ratio) + gradient_end[2] * ratio)
+        draw.rectangle([(0, y), (width, y+1)], fill=(r, g, b))
+    
+    # Header text
+    draw.text((width//2, 50), "Sher Ali Building Material", font=font_medium, fill='white', anchor='mm')
+    receipt_type = "Purchase Receipt" if entry_type == 'stock_in' else "Sales Receipt"
+    draw.text((width//2, 90), receipt_type, font=font_normal, fill='white', anchor='mm')
+    draw.text((width//2, 130), f"Receipt #{entry.id}", font=font_normal, fill='white', anchor='mm')
+    draw.text((width//2, 165), entry.date.strftime('%d/%m/%Y'), font=font_small, fill='white', anchor='mm')
+    
+    y_pos = 240
+    x_margin = 50
+    
+    if entry_type == 'stock_in':
+        person = entry.supplier
+        person_label = "Supplier"
+    else:
+        person = entry.customer
+        person_label = "Customer"
+    
+    draw.text((x_margin, y_pos), f"{person_label}:", font=font_normal, fill='#333')
+    draw.text((width - x_margin, y_pos), person.name, font=font_normal, fill='#000', anchor='rm')
+    y_pos += 40
+    
+    if person.phone:
+        draw.text((x_margin, y_pos), "Phone:", font=font_normal, fill='#333')
+        draw.text((width - x_margin, y_pos), person.phone, font=font_normal, fill='#000', anchor='rm')
+        y_pos += 40
+    
+    draw.line([(x_margin, y_pos), (width - x_margin, y_pos)], fill='#ddd', width=2)
+    y_pos += 30
+    
+    draw.text((x_margin, y_pos), "Material:", font=font_normal, fill='#333')
+    draw.text((width - x_margin, y_pos), entry.material.name, font=font_normal, fill='#000', anchor='rm')
+    y_pos += 40
+    
+    draw.text((x_margin, y_pos), "Quantity:", font=font_normal, fill='#333')
+    draw.text((width - x_margin, y_pos), f"{entry.quantity} {entry.material.unit}", font=font_normal, fill='#000', anchor='rm')
+    y_pos += 40
+    
+    draw.text((x_margin, y_pos), "Rate:", font=font_normal, fill='#333')
+    draw.text((width - x_margin, y_pos), f"Rs. {entry.rate:,.0f}", font=font_normal, fill='#000', anchor='rm')
+    y_pos += 50
+    
+    draw.rectangle([(x_margin, y_pos), (width - x_margin, y_pos + 250)], outline='#ddd', width=2)
+    y_pos += 20
+    
+    draw.text((x_margin + 20, y_pos), "Subtotal:", font=font_normal, fill='#666')
+    draw.text((width - x_margin - 20, y_pos), f"Rs. {(entry.quantity * entry.rate):,.0f}", font=font_normal, fill='#000', anchor='rm')
+    y_pos += 40
+    
+    if entry.other_expenses > 0:
+        draw.text((x_margin + 20, y_pos), "Other Expenses:", font=font_normal, fill='#666')
+        draw.text((width - x_margin - 20, y_pos), f"Rs. {entry.other_expenses:,.0f}", font=font_normal, fill='#000', anchor='rm')
+        y_pos += 40
+    
+    if hasattr(entry, 'discount') and entry.discount > 0:
+        draw.text((x_margin + 20, y_pos), "Discount:", font=font_normal, fill='#666')
+        draw.text((width - x_margin - 20, y_pos), f"- Rs. {entry.discount:,.0f}", font=font_normal, fill='#dc3545', anchor='rm')
+        y_pos += 40
+    
+    draw.line([(x_margin + 20, y_pos), (width - x_margin - 20, y_pos)], fill='#999', width=2)
+    y_pos += 15
+    
+    draw.text((x_margin + 20, y_pos), "TOTAL:", font=font_medium, fill='#000')
+    draw.text((width - x_margin - 20, y_pos), f"Rs. {entry.total_amount:,.0f}", font=font_medium, fill=gradient_start, anchor='rm')
+    y_pos += 45
+    
+    draw.text((x_margin + 20, y_pos), "Paid:", font=font_normal, fill='#666')
+    draw.text((width - x_margin - 20, y_pos), f"Rs. {entry.paid_amount:,.0f}", font=font_normal, fill='#28a745', anchor='rm')
+    y_pos += 60
+    
+    box_y = y_pos
+    draw.rectangle([(x_margin, box_y), (width - x_margin, box_y + 120)], fill=gradient_start)
+    
+    draw.text((width//2, box_y + 30), "REMAINING AMOUNT", font=font_normal, fill='white', anchor='mm')
+    draw.text((width//2, box_y + 75), f"Rs. {entry.remaining:,.0f}", font=font_large, fill='white', anchor='mm')
+    
+    y_pos = box_y + 140
+    draw.text((width//2, y_pos), "Thank you for your business!", font=font_small, fill='#666', anchor='mm')
+    draw.text((width//2, y_pos + 25), "Sher Ali Building Material", font=font_small, fill='#999', anchor='mm')
+    
+    img_io = BytesIO()
+    img.save(img_io, 'PNG', quality=95)
+    img_io.seek(0)
+    return img_io.getvalue()
 
 
 def create_khata_statement_pdf(person, person_type):
     """
     Create Khata statement PDF using ReportLab with Urdu support.
     Calculates balance dynamically from transactions.
-    
+
     Args:
         person: Supplier or Customer object
         person_type: 'supplier' or 'customer'
-    
+
     Returns:
         bytes: PDF data
     """
-    from decimal import Decimal
-    
-    # Calculate closing balance dynamically
     opening_balance = Decimal(str(person.opening_balance or 0))
-    
+
     if person_type == 'supplier':
         stock_transactions = StockIn.query.filter_by(supplier_id=person.id).all()
         payments = Cashbook.query.filter_by(reference_type='supplier', reference_id=person.id).all()
     else:
         stock_transactions = StockOut.query.filter_by(customer_id=person.id).all()
         payments = Cashbook.query.filter_by(reference_type='customer', reference_id=person.id).all()
-    
-    # Calculate totals
+
     total_debits = sum(Decimal(str(tx.total_amount)) for tx in stock_transactions) if stock_transactions else Decimal('0')
     total_credits = sum(Decimal(str(p.amount)) for p in payments) if payments else Decimal('0')
     closing_balance = opening_balance + total_debits - total_credits
-    
+
     urdu_font = register_urdu_font()
-    
+
     pdf_io = BytesIO()
-    doc = SimpleDocTemplate(pdf_io, pagesize=letter, rightMargin=0.5*inch, leftMargin=0.5*inch,
-                            topMargin=0.75*inch, bottomMargin=0.75*inch)
-    
-    styles = getSampleStyleSheet()
+    doc = SimpleDocTemplate(pdf_io, pagesize=letter, rightMargin=0.5*inch,
+                            leftMargin=0.5*inch, topMargin=0.75*inch,
+                            bottomMargin=0.75*inch)
+    styles, title_style, heading_style, normal_style = _base_styles(urdu_font, title_size=18)
     story = []
-    
-    # Custom styles
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=18,
-        textColor=colors.HexColor('#667eea'),
-        spaceAfter=12,
-        alignment=1
-    )
-    
-    normal_style = ParagraphStyle(
-        'CustomNormal',
-        parent=styles['Normal'],
-        fontSize=11,
-        fontName=urdu_font,
-        spaceAfter=6
-    )
-    
+
     # Header
-    title = "Sher Ali Building Material"
     statement_type = "بیان - سپلائر" if person_type == 'supplier' else "بیان - گاہک"
-    
-    story.append(Paragraph(title, title_style))
-    story.append(Paragraph(statement_type, title_style))
+    story.append(P("Sher Ali Building Material", title_style))
+    story.append(P(statement_type, title_style))
     story.append(Spacer(1, 0.2*inch))
-    
+
     # Person info
-    person_label = "سپلائر:" if person_type == 'supplier' else "گاہک:"
     person_data = [
-        [Paragraph("نام:", normal_style), Paragraph(person.name, normal_style)],
-        [Paragraph("فون:", normal_style), Paragraph(person.phone or '-', normal_style)],
-        [Paragraph("پتہ:", normal_style), Paragraph(person.address or '-', normal_style)],
-        [Paragraph("تاریخ:", normal_style), Paragraph(datetime.now().strftime('%d/%m/%Y'), normal_style)],
+        [P("نام:", normal_style), P(person.name, normal_style)],
+        [P("فون:", normal_style), P(person.phone or '-', normal_style)],
+        [P("پتہ:", normal_style), P(person.address or '-', normal_style)],
+        [P("تاریخ:", normal_style), P(datetime.now().strftime('%d/%m/%Y'), normal_style)],
     ]
-    
     person_table = Table(person_data, colWidths=[1.5*inch, 3.5*inch])
-    person_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8f9fa')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-    ]))
+    person_table.setStyle(_table_style('#f8f9fa', align='CENTER'))
     story.append(person_table)
     story.append(Spacer(1, 0.3*inch))
-    
+
     # Balance summary
     balance_data = [
-        [Paragraph("ابتدائی بقایا:", normal_style), Paragraph(f"Rs. {opening_balance:,.0f}", normal_style)],
-        [Paragraph("کل واجب الادا:", normal_style), Paragraph(f"Rs. {total_debits:,.0f}", normal_style)],
-        [Paragraph("کل ادائیگی:", normal_style), Paragraph(f"Rs. {total_credits:,.0f}", normal_style)],
+        [P("ابتدائی بقایا:", normal_style), P(f"Rs. {opening_balance:,.0f}", normal_style)],
+        [P("کل واجب الادا:", normal_style), P(f"Rs. {total_debits:,.0f}", normal_style)],
+        [P("کل ادائیگی:", normal_style), P(f"Rs. {total_credits:,.0f}", normal_style)],
     ]
-    
     balance_table = Table(balance_data, colWidths=[2*inch, 3*inch])
-    balance_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -2), colors.HexColor('#e9ecef')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-    ]))
+    balance_table.setStyle(_table_style('#e9ecef'))
     story.append(balance_table)
     story.append(Spacer(1, 0.2*inch))
-    
-    # Closing balance display (DYNAMIC)
+
+    # Closing balance (white text on blue)
     balance_status = "روپے واجب الادا" if closing_balance > 0 else "صاف ستھرا"
-    
+    big_white = ParagraphStyle('BigWhite', parent=normal_style, fontSize=14,
+                               textColor=colors.white)
+    white = ParagraphStyle('White', parent=normal_style, textColor=colors.white)
+
     closing_data = [
-        [Paragraph("موجودہ بیلنس:", ParagraphStyle('Bold', parent=normal_style, fontSize=14, bold=True)), 
-         Paragraph(f"Rs. {closing_balance:,.0f}", ParagraphStyle('Bold', parent=normal_style, fontSize=14, bold=True))],
-        [Paragraph("حالت:", normal_style), Paragraph(balance_status, normal_style)],
+        [P("موجودہ بیلنس:", big_white), P(f"Rs. {closing_balance:,.0f}", big_white)],
+        [P("حالت:", white), P(balance_status, white)],
     ]
-    
     closing_table = Table(closing_data, colWidths=[2*inch, 3*inch])
     closing_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#667eea')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), urdu_font),
-        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ('GRID', (0, 0), (-1, -1), 1, colors.grey),
     ]))
     story.append(closing_table)
     story.append(Spacer(1, 0.3*inch))
-    
+
     # Footer
-    story.append(Paragraph("شکریہ آپ کے کاروبار کے لیے!", normal_style))
-    story.append(Paragraph("Stock Management System", styles['Normal']))
-    
+    story.append(P("شکریہ آپ کے کاروبار کے لیے!", normal_style))
+    story.append(P("Stock Management System", normal_style))
+
     doc.build(story)
     pdf_io.seek(0)
     return pdf_io.getvalue()
@@ -356,30 +430,134 @@ def create_khata_statement_pdf(person, person_type):
 
 def create_khata_statement_image(person, person_type):
     """
-    DEPRECATED: Use create_khata_statement_pdf instead.
-    Kept for backwards compatibility.
+    Create Khata statement image (PNG) for sharing.
+    Calculates balance dynamically from transactions.
+    
+    Args:
+        person: Supplier or Customer object
+        person_type: 'supplier' or 'customer'
+    
+    Returns:
+        bytes: PNG image data
     """
-    return create_khata_statement_pdf(person, person_type)
+    width, height = 800, 800
+    
+    if person_type == 'supplier':
+        gradient_start = (102, 126, 234)  # Purple
+        gradient_end = (118, 75, 162)
+    else:
+        gradient_start = (17, 153, 142)  # Teal
+        gradient_end = (56, 239, 125)
+    
+    img = Image.new('RGB', (width, height), 'white')
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        font_xlarge = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 50)
+        font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+        font_medium = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
+        font_normal = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
+        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+    except:
+        font_xlarge = font_large = font_medium = font_normal = font_small = ImageFont.load_default()
+    
+    # Draw gradient header
+    for y in range(180):
+        ratio = y / 180
+        r = int(gradient_start[0] * (1 - ratio) + gradient_end[0] * ratio)
+        g = int(gradient_start[1] * (1 - ratio) + gradient_end[1] * ratio)
+        b = int(gradient_start[2] * (1 - ratio) + gradient_end[2] * ratio)
+        draw.rectangle([(0, y), (width, y+1)], fill=(r, g, b))
+    
+    draw.text((width//2, 50), "Sher Ali Building Material", font=font_medium, fill='white', anchor='mm')
+    draw.text((width//2, 90), "Account Statement", font=font_normal, fill='white', anchor='mm')
+    person_label = "Supplier" if person_type == 'supplier' else "Customer"
+    draw.text((width//2, 135), f"{person_label} Account", font=font_small, fill='white', anchor='mm')
+    
+    y_pos = 220
+    x_margin = 60
+    
+    box_height = 200
+    draw.rectangle([(x_margin, y_pos), (width - x_margin, y_pos + box_height)], fill='#f8f9fa', outline='#ddd', width=2)
+    
+    y_pos += 25
+    draw.text((x_margin + 30, y_pos), "Name:", font=font_normal, fill='#666')
+    draw.text((width - x_margin - 30, y_pos), person.name, font=font_medium, fill='#000', anchor='rm')
+    y_pos += 50
+    
+    if person.phone:
+        draw.text((x_margin + 30, y_pos), "Phone:", font=font_normal, fill='#666')
+        draw.text((width - x_margin - 30, y_pos), person.phone, font=font_normal, fill='#000', anchor='rm')
+        y_pos += 50
+    
+    if person.address:
+        draw.text((x_margin + 30, y_pos), "Address:", font=font_normal, fill='#666')
+        addr = person.address[:40] + '...' if len(person.address) > 40 else person.address
+        draw.text((width - x_margin - 30, y_pos), addr, font=font_normal, fill='#000', anchor='rm')
+        y_pos += 50
+    
+    now = datetime.now()
+    draw.text((x_margin + 30, y_pos), "Date:", font=font_normal, fill='#666')
+    draw.text((width - x_margin - 30, y_pos), now.strftime('%d/%m/%Y'), font=font_normal, fill='#000', anchor='rm')
+    
+    # Balance box
+    y_pos = 450
+    box_height = 220
+    draw.rectangle([(x_margin, y_pos), (width - x_margin, y_pos + box_height)], fill=gradient_start)
+    
+    draw.text((width//2, y_pos + 40), "CURRENT BALANCE", font=font_medium, fill='white', anchor='mm')
+    draw.text((width//2, y_pos + 120), f"Rs. {person.current_balance:,.0f}", font=font_xlarge, fill='white', anchor='mm')
+    
+    status = "Amount Due" if person.current_balance > 0 else "Clear"
+    draw.text((width//2, y_pos + 180), status, font=font_normal, fill='white', anchor='mm')
+    
+    # Footer
+    draw.text((width//2, 710), "Thank you for your business!", font=font_small, fill='#666', anchor='mm')
+    draw.text((width//2, 740), "Stock Management System", font=font_small, fill='#999', anchor='mm')
+    
+    img_io = BytesIO()
+    img.save(img_io, 'PNG', quality=95)
+    img_io.seek(0)
+    return img_io.getvalue()
+
+
+# ---------- PNG versions (same layout, rendered from the PDF) ----------
+
+def pdf_to_png_bytes(pdf_bytes, dpi=150):
+    """Render the first page of a PDF to PNG bytes. Needs: pip install pymupdf"""
+    import fitz  # PyMuPDF
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    try:
+        pix = doc[0].get_pixmap(dpi=dpi)
+        return pix.tobytes("png")
+    finally:
+        doc.close()
+
+
+def create_receipt_png(entry, entry_type='stock_in'):
+    """Receipt as PNG bytes (for WhatsApp sharing)."""
+    return pdf_to_png_bytes(create_receipt_pdf(entry, entry_type))
+
+
+def create_khata_statement_png(person, person_type):
+    """Khata statement as PNG bytes (for WhatsApp sharing)."""
+    return pdf_to_png_bytes(create_khata_statement_pdf(person, person_type))
 
 
 def save_temp_image(image_bytes, prefix='receipt', is_pdf=True):
     """
     Save image/PDF bytes to temporary file.
-    
+
     Args:
         image_bytes: Image/PDF data as bytes
         prefix: Filename prefix
         is_pdf: If True, saves as PDF; otherwise as PNG
-    
+
     Returns:
         str: Path to temporary file
     """
     suffix = '.pdf' if is_pdf else '.png'
-    temp_file = tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=suffix,
-        prefix=f'{prefix}_'
-    )
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix, prefix=f'{prefix}_')
     temp_file.write(image_bytes)
     temp_file.close()
     return temp_file.name
@@ -390,63 +568,43 @@ def image_to_base64(image_bytes):
     return base64.b64encode(image_bytes).decode('utf-8')
 
 
+def _clean_phone(phone, default_cc='92'):
+    """03113335055 / +92 311 3335055 -> 923113335055. '' if missing."""
+    digits = re.sub(r'\D', '', phone or '')
+    if not digits:
+        return ''
+    if digits.startswith('00'):
+        digits = digits[2:]
+    elif digits.startswith('0'):
+        digits = default_cc + digits[1:]
+    elif not digits.startswith(default_cc):
+        digits = default_cc + digits
+    return digits
+
+
 def send_whatsapp_image_browser(phone, message_text):
     """
     Generate WhatsApp Web link with pre-filled message.
     Image will be downloaded separately and user attaches it.
-    
-    Args:
-        phone: Phone number (with or without country code)
-        message_text: Message to send
-    
+
     Returns:
-        dict: {url: whatsapp_url, phone: cleaned_phone}
+        dict: {url, phone, message}
     """
-    # Clean phone number
-    if phone:
-        phone = phone.lstrip('0')
-        if not phone.startswith('92'):
-            phone = '92' + phone
-    else:
-        phone = ''
-    
-    # Create WhatsApp URL with message
-    whatsapp_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message_text)}"
-    
-    return {
-        'url': whatsapp_url,
-        'phone': phone,
-        'message': message_text
-    }
+    phone = _clean_phone(phone)
+    whatsapp_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message_text)}" if phone else ''
+    return {'url': whatsapp_url, 'phone': phone, 'message': message_text}
 
 
 def get_whatsapp_desktop_link(phone, message_text):
     """
     Generate link to open WhatsApp Desktop with message.
-    
-    Args:
-        phone: Phone number (with or without country code)
-        message_text: Message to send
-    
+
     Returns:
-        dict: {desktop_url: whatsapp_desktop_url, web_url: whatsapp_web_url, phone: cleaned_phone}
+        dict: {desktop_url, web_url, phone, message}
     """
-    # Clean phone number
-    if phone:
-        phone = phone.lstrip('0')
-        if not phone.startswith('92'):
-            phone = '92' + phone
-    else:
-        phone = ''
-    
-    # WhatsApp Desktop URL scheme (works on Windows, macOS, Linux)
-    # Note: WhatsApp Desktop must be installed
-    desktop_url = f"whatsapp://send?phone={phone}&text={urllib.parse.quote(message_text)}"
-    web_url = f"https://wa.me/{phone}?text={urllib.parse.quote(message_text)}"
-    
-    return {
-        'desktop_url': desktop_url,
-        'web_url': web_url,
-        'phone': phone,
-        'message': message_text
-    }
+    phone = _clean_phone(phone)
+    text = urllib.parse.quote(message_text)
+    desktop_url = f"whatsapp://send?phone={phone}&text={text}" if phone else ''
+    web_url = f"https://wa.me/{phone}?text={text}" if phone else ''
+    return {'desktop_url': desktop_url, 'web_url': web_url,
+            'phone': phone, 'message': message_text}

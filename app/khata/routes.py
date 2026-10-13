@@ -337,13 +337,13 @@ def share_statement_whatsapp(person_type, person_id):
     # Create WhatsApp links (Desktop primary, Web fallback)
     wa_data = get_whatsapp_desktop_link(phone, message)
     
-    # Generate PDF
-    pdf_bytes = create_khata_statement_image(person, person_type)
+    # Generate PNG image for sharing
+    image_bytes = create_khata_statement_image(person, person_type)
     
-    # Save temporary file
-    temp_path = save_temp_image(pdf_bytes, prefix=f'khata_{person_type}_{person_id}', is_pdf=True)
+    # Save temporary file as PNG
+    temp_path = save_temp_image(image_bytes, prefix=f'khata_{person_type}_{person_id}', is_pdf=False)
     
-    # Create a temporary URL for download
+    # Create a temporary URL for download - points to the PDF download route
     image_download_url = f"{request.host_url}khata/{person_type}/{person_id}/statement-image"
     
     return render_template(
@@ -351,5 +351,5 @@ def share_statement_whatsapp(person_type, person_id):
         wa_link=wa_data['desktop_url'],
         wa_web_link=wa_data['web_url'],
         image_url=image_download_url,
-        filename=f'khata_statement_{person.name}_{person_id}.pdf'
+        filename=f'khata_statement_{person.name}_{person_id}.png'
     )
