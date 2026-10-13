@@ -20,12 +20,23 @@ from app.models import StockIn, StockOut, Cashbook
 def register_urdu_font():
     """Register Urdu font for PDF generation."""
     try:
-        font_path = "/usr/share/fonts/truetype/noto/NotoSansUrdu-Regular.ttf"
-        if not os.path.exists(font_path):
-            # Fallback to any available Urdu font
-            font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-        pdfmetrics.registerFont(TTFont('Urdu', font_path))
-        return 'Urdu'
+        # Try multiple font paths
+        font_paths = [
+            "/usr/share/fonts/truetype/noto/NotoSansUrdu-Regular.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
+        
+        for font_path in font_paths:
+            if os.path.exists(font_path):
+                try:
+                    pdfmetrics.registerFont(TTFont('UrduFont', font_path))
+                    return 'UrduFont'
+                except:
+                    continue
+        
+        # Fallback to Helvetica if no font found
+        return 'Helvetica'
     except:
         return 'Helvetica'
 
