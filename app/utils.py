@@ -15,10 +15,20 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-import arabic_reshaper
-from bidi.algorithm import get_display
+try:
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+    _HAS_URDU_SHAPING = True
+except ImportError:
+    arabic_reshaper = None
+    get_display = None
+    _HAS_URDU_SHAPING = False
 from app.models import StockIn, StockOut, Cashbook
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, features
+
+# Pillow with libraqm handles Arabic shaping/RTL natively; without it we
+# fall back to arabic-reshaper + bidi (and plain text if those are missing).
+_HAS_RAQM = bool(features.check('raqm'))
 
 # Bundle the font inside the project so it works on any server
 FONT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -61,7 +71,12 @@ def ur(text):
     has no Latin letters.
     """
     text = '' if text is None else str(text)
-    shown = get_display(arabic_reshaper.reshape(text))
+    if _HAS_URDU_SHAPING:
+        shown = get_display(arabic_reshaper.reshape(text))
+    else:
+        # arabic-reshaper/python-bidi not installed: PDF Urdu will render
+        # unshaped, but the app keeps running (PNG receipts are unaffected).
+        shown = text
 
     out, last = [], 0
     for m in _LATIN_RUN.finditer(shown):
@@ -75,6 +90,91 @@ def ur(text):
 def P(text, style):
     """Paragraph with Urdu shaping applied."""
     return Paragraph(ur(text), style)
+
+
+# ---------- PIL (PNG image) text helpers ----------
+
+_ARABIC_RE = re.compile(
+    '[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]'
+)
+
+_PIL_FONT_CACHE = {}
+
+_URDU_PIL_FONTS = [
+    FONT_FILE,
+    os.path.join(os.path.dirname(FONT_FILE), 'NotoNaskhArabic-Bold.ttf'),
+    '/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf',
+    '/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf',
+    '/usr/share/fonts/truetype/noto/NotoNastaliqUrdu-Regular.ttf',
+    '/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf',
+]
+_LATIN_PIL_FONTS_BOLD = [
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+]
+_LATIN_PIL_FONTS = [
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+]
+
+
+def _load_pil_font(size, urdu=False, bold=False):
+    """Load and cache a PIL font; falls back to the default bitmap font."""
+    key = (size, urdu, bold)
+    if key in _PIL_FONT_CACHE:
+        return _PIL_FONT_CACHE[key]
+
+    if urdu:
+        # Naskh bold is preferred but the regular face is an acceptable
+        # fallback; the bundled font guarantees availability.
+        candidates = _URDU_PIL_FONTS if not bold else \
+            [os.path.join(os.path.dirname(FONT_FILE), 'NotoNaskhArabic-Bold.ttf')] + _URDU_PIL_FONTS
+    else:
+        candidates = (_LATIN_PIL_FONTS_BOLD if bold else _LATIN_PIL_FONTS) + _URDU_PIL_FONTS
+
+    font = ImageFont.load_default()
+    for path in candidates:
+        if path and os.path.exists(path):
+            try:
+                font = ImageFont.truetype(path, size)
+                break
+            except Exception:
+                continue
+
+    _PIL_FONT_CACHE[key] = font
+    return font
+
+
+def _pil_font_for(text, size, bold=False):
+    """Pick an Urdu-capable font when the text contains Arabic script."""
+    has_arabic = bool(_ARABIC_RE.search(str(text or '')))
+    return _load_pil_font(size, urdu=has_arabic, bold=bold)
+
+
+def _draw_text(draw, xy, text, size, fill=None, anchor=None, bold=False):
+    """Draw one line of text on a PIL image with automatic Urdu support.
+
+    - Switches to a bundled Noto Naskh Arabic font when the text contains
+      Arabic-script characters (so Urdu names render instead of tofu boxes).
+    - Uses raqm shaping/RTL when available, else arabic-reshaper + bidi.
+    """
+    text = '' if text is None else str(text)
+    font = _pil_font_for(text, size, bold=bold)
+
+    kwargs = {}
+    if anchor:
+        kwargs['anchor'] = anchor
+
+    if _ARABIC_RE.search(text):
+        if _HAS_RAQM:
+            kwargs['direction'] = 'rtl'
+        elif _HAS_URDU_SHAPING:
+            text = '\u200f' + get_display(arabic_reshaper.reshape(text))
+
+    try:
+        draw.text(xy, text, font=font, fill=fill, **kwargs)
+    except (TypeError, ValueError):
+        # Older Pillow / no-raqm build: retry without the direction kwarg.
+        kwargs.pop('direction', None)
+        draw.text(xy, text, font=font, fill=fill, **kwargs)
 
 
 def _base_styles(urdu_font, title_size=20):
@@ -233,15 +333,10 @@ def create_receipt_image(entry, entry_type='stock_in'):
     
     img = Image.new('RGB', (width, height), 'white')
     draw = ImageDraw.Draw(img)
-    
-    try:
-        font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
-        font_medium = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
-        font_normal = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
-        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-    except:
-        font_large = font_medium = font_normal = font_small = ImageFont.load_default()
-    
+
+    # Font sizes (per-string font is chosen automatically by _draw_text)
+    S_LARGE, S_MEDIUM, S_NORMAL, S_SMALL = 40, 28, 22, 18
+
     # Draw gradient header
     for y in range(200):
         ratio = y / 200
@@ -249,86 +344,86 @@ def create_receipt_image(entry, entry_type='stock_in'):
         g = int(gradient_start[1] * (1 - ratio) + gradient_end[1] * ratio)
         b = int(gradient_start[2] * (1 - ratio) + gradient_end[2] * ratio)
         draw.rectangle([(0, y), (width, y+1)], fill=(r, g, b))
-    
+
     # Header text
-    draw.text((width//2, 50), "Sher Ali Building Material", font=font_medium, fill='white', anchor='mm')
+    _draw_text(draw, (width//2, 50), "Sher Ali Building Material", S_MEDIUM, fill='white', anchor='mm', bold=True)
     receipt_type = "Purchase Receipt" if entry_type == 'stock_in' else "Sales Receipt"
-    draw.text((width//2, 90), receipt_type, font=font_normal, fill='white', anchor='mm')
-    draw.text((width//2, 130), f"Receipt #{entry.id}", font=font_normal, fill='white', anchor='mm')
-    draw.text((width//2, 165), entry.date.strftime('%d/%m/%Y'), font=font_small, fill='white', anchor='mm')
-    
+    _draw_text(draw, (width//2, 90), receipt_type, S_NORMAL, fill='white', anchor='mm')
+    _draw_text(draw, (width//2, 130), f"Receipt #{entry.id}", S_NORMAL, fill='white', anchor='mm')
+    _draw_text(draw, (width//2, 165), entry.date.strftime('%d/%m/%Y'), S_SMALL, fill='white', anchor='mm')
+
     y_pos = 240
     x_margin = 50
-    
+
     if entry_type == 'stock_in':
         person = entry.supplier
         person_label = "Supplier"
     else:
         person = entry.customer
         person_label = "Customer"
-    
-    draw.text((x_margin, y_pos), f"{person_label}:", font=font_normal, fill='#333')
-    draw.text((width - x_margin, y_pos), person.name, font=font_normal, fill='#000', anchor='rm')
+
+    _draw_text(draw, (x_margin, y_pos), f"{person_label}:", S_NORMAL, fill='#333')
+    _draw_text(draw, (width - x_margin, y_pos), person.name, S_NORMAL, fill='#000', anchor='rm')
     y_pos += 40
-    
+
     if person.phone:
-        draw.text((x_margin, y_pos), "Phone:", font=font_normal, fill='#333')
-        draw.text((width - x_margin, y_pos), person.phone, font=font_normal, fill='#000', anchor='rm')
+        _draw_text(draw, (x_margin, y_pos), "Phone:", S_NORMAL, fill='#333')
+        _draw_text(draw, (width - x_margin, y_pos), person.phone, S_NORMAL, fill='#000', anchor='rm')
         y_pos += 40
-    
+
     draw.line([(x_margin, y_pos), (width - x_margin, y_pos)], fill='#ddd', width=2)
     y_pos += 30
-    
-    draw.text((x_margin, y_pos), "Material:", font=font_normal, fill='#333')
-    draw.text((width - x_margin, y_pos), entry.material.name, font=font_normal, fill='#000', anchor='rm')
+
+    _draw_text(draw, (x_margin, y_pos), "Material:", S_NORMAL, fill='#333')
+    _draw_text(draw, (width - x_margin, y_pos), entry.material.name, S_NORMAL, fill='#000', anchor='rm')
     y_pos += 40
-    
-    draw.text((x_margin, y_pos), "Quantity:", font=font_normal, fill='#333')
-    draw.text((width - x_margin, y_pos), f"{entry.quantity} {entry.material.unit}", font=font_normal, fill='#000', anchor='rm')
+
+    _draw_text(draw, (x_margin, y_pos), "Quantity:", S_NORMAL, fill='#333')
+    _draw_text(draw, (width - x_margin, y_pos), f"{entry.quantity} {entry.material.unit}", S_NORMAL, fill='#000', anchor='rm')
     y_pos += 40
-    
-    draw.text((x_margin, y_pos), "Rate:", font=font_normal, fill='#333')
-    draw.text((width - x_margin, y_pos), f"Rs. {entry.rate:,.0f}", font=font_normal, fill='#000', anchor='rm')
+
+    _draw_text(draw, (x_margin, y_pos), "Rate:", S_NORMAL, fill='#333')
+    _draw_text(draw, (width - x_margin, y_pos), f"Rs. {entry.rate:,.0f}", S_NORMAL, fill='#000', anchor='rm')
     y_pos += 50
-    
+
     draw.rectangle([(x_margin, y_pos), (width - x_margin, y_pos + 250)], outline='#ddd', width=2)
     y_pos += 20
-    
-    draw.text((x_margin + 20, y_pos), "Subtotal:", font=font_normal, fill='#666')
-    draw.text((width - x_margin - 20, y_pos), f"Rs. {(entry.quantity * entry.rate):,.0f}", font=font_normal, fill='#000', anchor='rm')
+
+    _draw_text(draw, (x_margin + 20, y_pos), "Subtotal:", S_NORMAL, fill='#666')
+    _draw_text(draw, (width - x_margin - 20, y_pos), f"Rs. {(entry.quantity * entry.rate):,.0f}", S_NORMAL, fill='#000', anchor='rm')
     y_pos += 40
-    
+
     if entry.other_expenses > 0:
-        draw.text((x_margin + 20, y_pos), "Other Expenses:", font=font_normal, fill='#666')
-        draw.text((width - x_margin - 20, y_pos), f"Rs. {entry.other_expenses:,.0f}", font=font_normal, fill='#000', anchor='rm')
+        _draw_text(draw, (x_margin + 20, y_pos), "Other Expenses:", S_NORMAL, fill='#666')
+        _draw_text(draw, (width - x_margin - 20, y_pos), f"Rs. {entry.other_expenses:,.0f}", S_NORMAL, fill='#000', anchor='rm')
         y_pos += 40
-    
+
     if hasattr(entry, 'discount') and entry.discount > 0:
-        draw.text((x_margin + 20, y_pos), "Discount:", font=font_normal, fill='#666')
-        draw.text((width - x_margin - 20, y_pos), f"- Rs. {entry.discount:,.0f}", font=font_normal, fill='#dc3545', anchor='rm')
+        _draw_text(draw, (x_margin + 20, y_pos), "Discount:", S_NORMAL, fill='#666')
+        _draw_text(draw, (width - x_margin - 20, y_pos), f"- Rs. {entry.discount:,.0f}", S_NORMAL, fill='#dc3545', anchor='rm')
         y_pos += 40
-    
+
     draw.line([(x_margin + 20, y_pos), (width - x_margin - 20, y_pos)], fill='#999', width=2)
     y_pos += 15
-    
-    draw.text((x_margin + 20, y_pos), "TOTAL:", font=font_medium, fill='#000')
-    draw.text((width - x_margin - 20, y_pos), f"Rs. {entry.total_amount:,.0f}", font=font_medium, fill=gradient_start, anchor='rm')
+
+    _draw_text(draw, (x_margin + 20, y_pos), "TOTAL:", S_MEDIUM, fill='#000', bold=True)
+    _draw_text(draw, (width - x_margin - 20, y_pos), f"Rs. {entry.total_amount:,.0f}", S_MEDIUM, fill=gradient_start, anchor='rm', bold=True)
     y_pos += 45
-    
-    draw.text((x_margin + 20, y_pos), "Paid:", font=font_normal, fill='#666')
-    draw.text((width - x_margin - 20, y_pos), f"Rs. {entry.paid_amount:,.0f}", font=font_normal, fill='#28a745', anchor='rm')
+
+    _draw_text(draw, (x_margin + 20, y_pos), "Paid:", S_NORMAL, fill='#666')
+    _draw_text(draw, (width - x_margin - 20, y_pos), f"Rs. {entry.paid_amount:,.0f}", S_NORMAL, fill='#28a745', anchor='rm')
     y_pos += 60
-    
+
     box_y = y_pos
     draw.rectangle([(x_margin, box_y), (width - x_margin, box_y + 120)], fill=gradient_start)
-    
-    draw.text((width//2, box_y + 30), "REMAINING AMOUNT", font=font_normal, fill='white', anchor='mm')
-    draw.text((width//2, box_y + 75), f"Rs. {entry.remaining:,.0f}", font=font_large, fill='white', anchor='mm')
-    
+
+    _draw_text(draw, (width//2, box_y + 30), "REMAINING AMOUNT", S_NORMAL, fill='white', anchor='mm')
+    _draw_text(draw, (width//2, box_y + 75), f"Rs. {entry.remaining:,.0f}", S_LARGE, fill='white', anchor='mm', bold=True)
+
     y_pos = box_y + 140
-    draw.text((width//2, y_pos), "Thank you for your business!", font=font_small, fill='#666', anchor='mm')
-    draw.text((width//2, y_pos + 25), "Sher Ali Building Material", font=font_small, fill='#999', anchor='mm')
-    
+    _draw_text(draw, (width//2, y_pos), "Thank you for your business!", S_SMALL, fill='#666', anchor='mm')
+    _draw_text(draw, (width//2, y_pos + 25), "Sher Ali Building Material", S_SMALL, fill='#999', anchor='mm')
+
     img_io = BytesIO()
     img.save(img_io, 'PNG', quality=95)
     img_io.seek(0)
@@ -451,16 +546,10 @@ def create_khata_statement_image(person, person_type):
     
     img = Image.new('RGB', (width, height), 'white')
     draw = ImageDraw.Draw(img)
-    
-    try:
-        font_xlarge = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 50)
-        font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
-        font_medium = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
-        font_normal = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
-        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-    except:
-        font_xlarge = font_large = font_medium = font_normal = font_small = ImageFont.load_default()
-    
+
+    # Font sizes (per-string font is chosen automatically by _draw_text)
+    S_XLARGE, S_MEDIUM, S_NORMAL, S_SMALL = 50, 28, 22, 18
+
     # Draw gradient header
     for y in range(180):
         ratio = y / 180
@@ -468,53 +557,53 @@ def create_khata_statement_image(person, person_type):
         g = int(gradient_start[1] * (1 - ratio) + gradient_end[1] * ratio)
         b = int(gradient_start[2] * (1 - ratio) + gradient_end[2] * ratio)
         draw.rectangle([(0, y), (width, y+1)], fill=(r, g, b))
-    
-    draw.text((width//2, 50), "Sher Ali Building Material", font=font_medium, fill='white', anchor='mm')
-    draw.text((width//2, 90), "Account Statement", font=font_normal, fill='white', anchor='mm')
+
+    _draw_text(draw, (width//2, 50), "Sher Ali Building Material", S_MEDIUM, fill='white', anchor='mm', bold=True)
+    _draw_text(draw, (width//2, 90), "Account Statement", S_NORMAL, fill='white', anchor='mm')
     person_label = "Supplier" if person_type == 'supplier' else "Customer"
-    draw.text((width//2, 135), f"{person_label} Account", font=font_small, fill='white', anchor='mm')
-    
+    _draw_text(draw, (width//2, 135), f"{person_label} Account", S_SMALL, fill='white', anchor='mm')
+
     y_pos = 220
     x_margin = 60
-    
+
     box_height = 200
     draw.rectangle([(x_margin, y_pos), (width - x_margin, y_pos + box_height)], fill='#f8f9fa', outline='#ddd', width=2)
-    
+
     y_pos += 25
-    draw.text((x_margin + 30, y_pos), "Name:", font=font_normal, fill='#666')
-    draw.text((width - x_margin - 30, y_pos), person.name, font=font_medium, fill='#000', anchor='rm')
+    _draw_text(draw, (x_margin + 30, y_pos), "Name:", S_NORMAL, fill='#666')
+    _draw_text(draw, (width - x_margin - 30, y_pos), person.name, S_MEDIUM, fill='#000', anchor='rm', bold=True)
     y_pos += 50
-    
+
     if person.phone:
-        draw.text((x_margin + 30, y_pos), "Phone:", font=font_normal, fill='#666')
-        draw.text((width - x_margin - 30, y_pos), person.phone, font=font_normal, fill='#000', anchor='rm')
+        _draw_text(draw, (x_margin + 30, y_pos), "Phone:", S_NORMAL, fill='#666')
+        _draw_text(draw, (width - x_margin - 30, y_pos), person.phone, S_NORMAL, fill='#000', anchor='rm')
         y_pos += 50
-    
+
     if person.address:
-        draw.text((x_margin + 30, y_pos), "Address:", font=font_normal, fill='#666')
+        _draw_text(draw, (x_margin + 30, y_pos), "Address:", S_NORMAL, fill='#666')
         addr = person.address[:40] + '...' if len(person.address) > 40 else person.address
-        draw.text((width - x_margin - 30, y_pos), addr, font=font_normal, fill='#000', anchor='rm')
+        _draw_text(draw, (width - x_margin - 30, y_pos), addr, S_NORMAL, fill='#000', anchor='rm')
         y_pos += 50
-    
+
     now = datetime.now()
-    draw.text((x_margin + 30, y_pos), "Date:", font=font_normal, fill='#666')
-    draw.text((width - x_margin - 30, y_pos), now.strftime('%d/%m/%Y'), font=font_normal, fill='#000', anchor='rm')
-    
+    _draw_text(draw, (x_margin + 30, y_pos), "Date:", S_NORMAL, fill='#666')
+    _draw_text(draw, (width - x_margin - 30, y_pos), now.strftime('%d/%m/%Y'), S_NORMAL, fill='#000', anchor='rm')
+
     # Balance box
     y_pos = 450
     box_height = 220
     draw.rectangle([(x_margin, y_pos), (width - x_margin, y_pos + box_height)], fill=gradient_start)
-    
-    draw.text((width//2, y_pos + 40), "CURRENT BALANCE", font=font_medium, fill='white', anchor='mm')
-    draw.text((width//2, y_pos + 120), f"Rs. {person.current_balance:,.0f}", font=font_xlarge, fill='white', anchor='mm')
-    
+
+    _draw_text(draw, (width//2, y_pos + 40), "CURRENT BALANCE", S_MEDIUM, fill='white', anchor='mm', bold=True)
+    _draw_text(draw, (width//2, y_pos + 120), f"Rs. {person.current_balance:,.0f}", S_XLARGE, fill='white', anchor='mm', bold=True)
+
     status = "Amount Due" if person.current_balance > 0 else "Clear"
-    draw.text((width//2, y_pos + 180), status, font=font_normal, fill='white', anchor='mm')
-    
+    _draw_text(draw, (width//2, y_pos + 180), status, S_NORMAL, fill='white', anchor='mm')
+
     # Footer
-    draw.text((width//2, 710), "Thank you for your business!", font=font_small, fill='#666', anchor='mm')
-    draw.text((width//2, 740), "Stock Management System", font=font_small, fill='#999', anchor='mm')
-    
+    _draw_text(draw, (width//2, 710), "Thank you for your business!", S_SMALL, fill='#666', anchor='mm')
+    _draw_text(draw, (width//2, 740), "Stock Management System", S_SMALL, fill='#999', anchor='mm')
+
     img_io = BytesIO()
     img.save(img_io, 'PNG', quality=95)
     img_io.seek(0)
