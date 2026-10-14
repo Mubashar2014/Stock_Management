@@ -30,9 +30,14 @@ from PIL import Image, ImageDraw, ImageFont, features
 # fall back to arabic-reshaper + bidi (and plain text if those are missing).
 _HAS_RAQM = bool(features.check('raqm'))
 
-# Bundle the font inside the project so it works on any server
-FONT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                         'static', 'fonts', 'NotoNaskhArabic-Regular.ttf')
+# Bundle the fonts inside the project so it works on any server.
+# DejaVu (Latin) is essential: many servers lack it, and the Noto Naskh
+# Arabic face has NO Latin letters — without bundled DejaVu, Latin text
+# falls back to tofu boxes on those servers.
+_FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'fonts')
+FONT_FILE = os.path.join(_FONT_DIR, 'NotoNaskhArabic-Regular.ttf')
+_DEJAVU_FILE = os.path.join(_FONT_DIR, 'DejaVuSans.ttf')
+_DEJAVU_BOLD_FILE = os.path.join(_FONT_DIR, 'DejaVuSans-Bold.ttf')
 
 _FONT_CACHE = {}
 
@@ -102,17 +107,23 @@ _PIL_FONT_CACHE = {}
 
 _URDU_PIL_FONTS = [
     FONT_FILE,
-    os.path.join(os.path.dirname(FONT_FILE), 'NotoNaskhArabic-Bold.ttf'),
+    os.path.join(_FONT_DIR, 'NotoNaskhArabic-Bold.ttf'),
     '/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf',
     '/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf',
     '/usr/share/fonts/truetype/noto/NotoNastaliqUrdu-Regular.ttf',
     '/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf',
 ]
+# Bundled DejaVu first — guarantees Latin renders even when the server has
+# no system fonts. The Noto faces are a last resort (digits-only fallback).
 _LATIN_PIL_FONTS_BOLD = [
+    _DEJAVU_BOLD_FILE,
     '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+    '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
 ]
 _LATIN_PIL_FONTS = [
+    _DEJAVU_FILE,
     '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/TTF/DejaVuSans.ttf',
 ]
 
 
